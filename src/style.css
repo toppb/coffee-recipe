@@ -133,19 +133,25 @@ button.bag:focus{
   display:grid;
   grid-template-columns: 340px 1fr;
   grid-template-rows: 1fr;
+  box-sizing: border-box;
 }
 @media (max-width: 760px){
   .overlay{
     padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px) + 12px); /* Account for safe area at bottom */
     height: 100dvh;
+    box-sizing: border-box;
+    align-items: stretch; /* Make modal fill available height */
   }
   .modal{ 
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    max-height: calc(100dvh - 24px); /* Reduced padding on mobile */
+    max-height: 100%; /* Use 100% of overlay's available height */
+    height: 100%;
     width: 100%;
     display: flex;
     flex-direction: column;
+    margin: 0;
   }
 }
 .modalMedia{
@@ -176,10 +182,12 @@ button.bag:focus{
   }
   .modalBody{
     min-height: 0;
-    padding: 24px 20px;
-    flex: 1;
+    padding: 20px 16px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px); /* Account for safe area */
+    flex: 1 1 auto;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    overscroll-behavior: contain; /* Prevent scroll chaining */
   }
 }
 .titleRow{
