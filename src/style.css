@@ -120,6 +120,9 @@ button.bag:focus{
   padding: 24px;
   overflow: hidden;
   z-index: 2000;
+  /* Performance optimization */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 .overlay.open{ display:flex; }
 .modal{
@@ -134,6 +137,10 @@ button.bag:focus{
   grid-template-columns: 340px 1fr;
   grid-template-rows: 1fr;
   box-sizing: border-box;
+  /* Performance optimization */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  contain: layout style paint;
 }
 @media (max-width: 760px){
   .overlay{
@@ -175,6 +182,11 @@ button.bag:focus{
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Performance optimizations */
+  transform: translateZ(0); /* Force GPU acceleration */
+  -webkit-transform: translateZ(0);
+  contain: layout style paint;
+  isolation: isolate; /* Create new stacking context */
 }
 @media (max-width: 760px){
   .modalMedia{
@@ -188,6 +200,15 @@ button.bag:focus{
     overflow-y: auto;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     overscroll-behavior: contain; /* Prevent scroll chaining */
+    /* Performance optimizations for mobile */
+    transform: translateZ(0); /* Force GPU acceleration */
+    -webkit-transform: translateZ(0);
+    contain: layout style paint;
+    backface-visibility: hidden;
+    isolation: isolate; /* Create new stacking context */
+    /* Reduce repaints during scroll */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 .titleRow{
@@ -278,6 +299,9 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   font-size: 14px;
   line-height: 1.6;
   color: rgba(0,0,0,.82);
+  /* Performance optimization */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 @media (max-width: 760px){
   .recipeContent{
