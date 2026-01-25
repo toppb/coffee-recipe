@@ -151,10 +151,11 @@ async function main() {
   }
 
   // Camera position (world-space)
-  let camX = 0;
-  let camY = 0;
-  let targetCamX = 0;
-  let targetCamY = 0;
+  // Start camera at center of first tile for better initial view
+  let camX = TILE_WIDTH / 2;
+  let camY = TILE_HEIGHT / 2;
+  let targetCamX = camX;
+  let targetCamY = camY;
 
   // Drag state
   let dragging = false;
@@ -163,6 +164,7 @@ async function main() {
   let movedDuringDrag = false;
   let dragStartX = 0;
   let dragStartY = 0;
+  let lastDragEndTime = 0;
 
   // Tile dimensions - smaller for more frequent duplication
   const TILE_WIDTH = 1800;
@@ -524,7 +526,10 @@ async function main() {
       // Re-attach event listener (cloneNode doesn't copy event listeners)
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (!movedDuringDrag) {
+        e.preventDefault();
+        // Check if this was a click, not a drag
+        const timeSinceDragEnd = Date.now() - (lastDragEndTime || 0);
+        if (!movedDuringDrag || timeSinceDragEnd > 200) {
           openModal(item);
         }
       });
@@ -547,9 +552,10 @@ async function main() {
     setupBagCursor(el);
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Only prevent default if we're sure it's a click, not a drag
-      if (!movedDuringDrag) {
-        e.preventDefault();
+      e.preventDefault();
+      // Check if this was a click, not a drag
+      const timeSinceDragEnd = Date.now() - (lastDragEndTime || 0);
+      if (!movedDuringDrag || timeSinceDragEnd > 200) {
         openModal(item);
       }
     });
@@ -771,7 +777,9 @@ async function main() {
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
 
-    if (Math.abs(dx) + Math.abs(dy) > 3) {
+    // Only mark as moved if movement is significant (more than 5px)
+    // This prevents accidental drag detection on small touches/clicks
+    if (Math.abs(dx) + Math.abs(dy) > 5) {
       movedDuringDrag = true;
     }
 
@@ -791,6 +799,7 @@ async function main() {
     stage.classList.remove("dragging");
     stage.releasePointerCapture(e.pointerId);
     updateStageCursor(); // Update cursor state after drag ends
+    lastDragEndTime = Date.now(); // Track when drag ended
     setTimeout(() => (movedDuringDrag = false), 100);
   }, { passive: true });
 
