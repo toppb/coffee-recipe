@@ -120,12 +120,17 @@ button.bag:focus{
   padding: 24px;
   overflow: hidden;
   z-index: 2000;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
   /* Performance optimization */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
 .overlay.open{ 
   display:flex !important; /* Ensure modal shows when open class is added */
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 .modal{
   width:min(900px, 100%);

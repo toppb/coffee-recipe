@@ -158,11 +158,11 @@ async function main() {
   const COLS = 6; // Number of columns in the tile
 
   // Camera position (world-space)
-  // Start camera at center of first tile for better initial view
-  let camX = TILE_WIDTH / 2;
-  let camY = TILE_HEIGHT / 2;
-  let targetCamX = camX;
-  let targetCamY = camY;
+  // Will be initialized after layout is created and window dimensions are known
+  let camX = 0;
+  let camY = 0;
+  let targetCamX = 0;
+  let targetCamY = 0;
 
   // Drag state
   let dragging = false;
@@ -489,9 +489,11 @@ async function main() {
   // Wait for layout to be created
   const tileItems = await createTileLayout();
 
-  // Initialize camera to center of first tile
-  camX = TILE_WIDTH / 2 - window.innerWidth / 2;
-  camY = TILE_HEIGHT / 2 - window.innerHeight / 2;
+  // Initialize camera to center of first tile, accounting for viewport size
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  camX = TILE_WIDTH / 2 - vw / 2;
+  camY = TILE_HEIGHT / 2 - vh / 2;
   targetCamX = camX;
   targetCamY = camY;
 
@@ -600,8 +602,9 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Reduce radius on mobile for better performance, but not too much to avoid cut-off
+    // Use larger radius on mobile to ensure bags are visible, but throttle updates
     const renderRadius = isMobile ? 2 : 3; // Render 2 tiles on mobile, 3 on desktop
+    // On mobile, ensure we render enough tiles to fill the viewport
     const tilesToRender = [];
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
@@ -1044,9 +1047,12 @@ async function main() {
 
     // Load markdown recipe
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
-    // Show modal first, then pause rendering
+    // Show modal immediately
     overlay.classList.add("open");
-    overlay.style.display = "flex"; // Ensure it's visible
+    overlay.style.display = "flex";
+    overlay.style.visibility = "visible";
+    overlay.style.opacity = "1";
+    overlay.style.zIndex = "2000";
     renderPaused = true; // Pause grid rendering when modal is open
     
     // Scroll modal body to top
@@ -1119,7 +1125,8 @@ async function main() {
 
   function closeModal() {
     overlay.classList.remove("open");
-    overlay.style.display = "none"; // Ensure it's hidden
+    overlay.style.display = "none";
+    overlay.style.visibility = "hidden";
     renderPaused = false; // Resume grid rendering when modal closes
   }
 
