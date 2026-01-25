@@ -132,7 +132,7 @@ function imgFor(number) {
 }
 
 async function main() {
-  const res = await fetch("/src/data/coffee.json");
+  const res = await fetch("/data/coffee.json");
   const data = await res.json();
 
   const app = document.querySelector("#app");
