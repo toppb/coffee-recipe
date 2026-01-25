@@ -1,0 +1,25 @@
+[
+    { "number": 1,  "name": "Coffee 01", "rating": 5, "tags": ["Espresso"] },
+    { "number": 2,  "name": "Coffee 02", "rating": 4, "tags": ["Filter"] },
+    { "number": 3,  "name": "Coffee 03", "rating": 5, "tags": ["Espresso"] },
+    { "number": 4,  "name": "Coffee 04", "rating": 4, "tags": ["Filter"] },
+    { "number": 5,  "name": "Coffee 05", "rating": 5, "tags": ["Espresso"] },
+  
+    { "number": 6,  "name": "Coffee 06", "rating": 4, "tags": ["Filter"] },
+    { "number": 7,  "name": "Coffee 07", "rating": 5, "tags": ["Espresso"] },
+    { "number": 8,  "name": "Coffee 08", "rating": 4, "tags": ["Filter"] },
+    { "number": 9,  "name": "Coffee 09", "rating": 5, "tags": ["Espresso"] },
+    { "number": 10, "name": "Coffee 10", "rating": 4, "tags": ["Filter"] },
+  
+    { "number": 11, "name": "Coffee 11", "rating": 5, "tags": ["Espresso"] },
+    { "number": 12, "name": "Coffee 12", "rating": 4, "tags": ["Filter"] },
+    { "number": 13, "name": "Coffee 13", "rating": 5, "tags": ["Espresso"] },
+    { "number": 14, "name": "Coffee 14", "rating": 4, "tags": ["Filter"] },
+    { "number": 15, "name": "Coffee 15", "rating": 5, "tags": ["Espresso"] },
+  
+    { "number": 16, "name": "Coffee 16", "rating": 4, "tags": ["Filter"] },
+    { "number": 17, "name": "Coffee 17", "rating": 5, "tags": ["Espresso"] },
+    { "number": 18, "name": "Coffee 18", "rating": 4, "tags": ["Filter"] },
+    { "number": 19, "name": "Coffee 19", "rating": 5, "tags": ["Espresso"] },
+    { "number": 20, "name": "Coffee 20", "rating": 4, "tags": ["Filter"] }
+  ]  

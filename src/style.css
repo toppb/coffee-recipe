@@ -1,0 +1,343 @@
+:root{
+  --bg: #F6F0E6;
+  --shadow: 0 10px 30px rgba(0,0,0,.12);
+  --radius: 16px;
+  --text: #1b1b1b;
+  --muted: rgba(0,0,0,.6);
+}
+
+html,body{height:100%; margin:0;}
+body{
+  background: var(--bg);
+  overflow:hidden;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color: var(--text);
+}
+
+#stage{
+  position:fixed;
+  inset:0;
+  cursor: grab;
+  user-select:none;
+  touch-action:none;
+  contain: layout style paint; /* Optimize rendering performance */
+  transform: translateZ(0); /* Force GPU acceleration */
+}
+
+#stage.dragging{
+  cursor: grabbing;
+  will-change: transform; /* Hint to browser for optimization during drag */
+}
+#stage.bag-hovered{
+  cursor: pointer !important;
+}
+
+.bag,
+#stage .bag,
+#stage button.bag,
+button.bag{
+  position:absolute;
+  border:0;
+  background:transparent;
+  padding:4px;
+  cursor:pointer !important;
+  pointer-events: auto !important;
+  will-change: transform;
+  backface-visibility: hidden; /* Prevent jitter during transforms */
+  transform: translateZ(0); /* Force GPU acceleration */
+  z-index: 1;
+}
+.bag:hover,
+#stage .bag:hover,
+#stage button.bag:hover,
+button.bag:hover{
+  cursor:pointer !important;
+}
+.bag:active,
+#stage .bag:active,
+#stage button.bag:active,
+button.bag:active{
+  cursor:pointer !important;
+}
+.bag:focus,
+#stage .bag:focus,
+#stage button.bag:focus,
+button.bag:focus{
+  cursor:pointer !important;
+}
+
+.bag img{
+  display:block;
+  height:auto;
+  width:auto;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,.14));
+  transition: transform .15s ease, filter .15s ease;
+  pointer-events:none;
+}
+
+.bag:hover img{
+  transform: translateY(-2px) scale(1.03);
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.18));
+}
+
+/* Modal */
+.overlay{
+  position:fixed;
+  inset:0;
+  background: rgba(0,0,0,.42);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding: 24px;
+  overflow: hidden;
+  z-index: 2000;
+}
+.overlay.open{ display:flex; }
+.modal{
+  width:min(900px, 100%);
+  max-height: calc(100vh - 48px);
+  background:#fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow:hidden;
+  display:grid;
+  grid-template-columns: 340px 1fr;
+  grid-template-rows: 1fr;
+}
+@media (max-width: 760px){
+  .modal{ 
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    max-height: calc(100vh - 48px);
+  }
+}
+.modalMedia{
+  background:#fafafa;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.modalMedia img{
+  max-width:100%;
+  max-height:340px;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.16));
+}
+.modalBody{ 
+  padding: 32px; 
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 760px){
+  .modalMedia{
+    display: none;
+  }
+  .modalBody{
+    min-height: 0;
+  }
+}
+.titleRow{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-start;
+  margin-bottom: 8px;
+}
+.titleRow h1{
+  margin:0;
+  font-size: 20px;
+  line-height:1.2;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+#mTitle{
+  font-size: 26px;
+}
+h2{ margin:0; font-size: 20px; line-height:1.2; }
+.meta{ margin: 6px 0 14px; color: var(--muted); font-size: 13px; }
+
+.sectionTitle{
+  margin: 16px 0 6px;
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.55);
+}
+.tagsWrapper {
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pillRow{ 
+  display:inline-flex; 
+  flex-wrap:wrap; 
+  gap:8px; 
+}
+.pill{
+  font-size: 12px;
+  padding: 7px 10px;
+  background: rgba(0,0,0,.05);
+  border-radius: 999px;
+  color: rgba(0,0,0,.75);
+  display: inline-block;
+}
+.brew{
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(0,0,0,.82);
+}
+
+/* Recipe content (markdown) */
+.recipeContent{
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(0,0,0,.82);
+}
+
+.recipeContent h1,
+.recipeContent h2,
+.recipeContent h3{
+  margin: 20px 0 12px;
+  font-weight: 600;
+  color: rgba(0,0,0,.9);
+}
+
+.recipeContent h1{ font-size: 24px; }
+.recipeContent h2{ 
+  font-size: 20px; 
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0,0,0,.1);
+}
+.recipeContent h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.recipeContent h3{ font-size: 18px; }
+
+.recipeContent p{
+  margin: 12px 0;
+}
+
+.recipeContent ul,
+.recipeContent ol{
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.recipeContent li{
+  margin: 6px 0;
+}
+
+.recipeContent ul.nested{
+  margin-left: 20px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.recipeContent li.nested{
+  list-style-type: circle;
+}
+
+.recipeContent strong{
+  font-weight: 600;
+  color: rgba(0,0,0,.9);
+}
+
+.recipeContent em{
+  font-style: italic;
+}
+
+.recipeContent code{
+  background: rgba(0,0,0,.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.recipeContent pre{
+  background: rgba(0,0,0,.05);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.recipeContent pre code{
+  background: none;
+  padding: 0;
+}
+
+.recipeContent a{
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.recipeContent a:hover{
+  text-decoration: underline;
+}
+
+.recipeContent .loading,
+.recipeContent .no-recipe{
+  color: rgba(0,0,0,.5);
+  font-style: italic;
+  padding: 12px 0;
+}
+.closeBtn{
+  border:0;
+  background: rgba(0,0,0,.06);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor:pointer;
+  font-size: 20px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0,0,0,.7);
+}
+.closeBtn:hover{ 
+  background: rgba(0,0,0,.09);
+  color: rgba(0,0,0,.9);
+}
+
+/* Floating instruction */
+.instruction{
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+@media (max-width: 760px){
+  .instruction{
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 24px;
+    max-width: calc(100% - 32px);
+    width: auto;
+    white-space: nowrap;
+  }
+}

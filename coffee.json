@@ -1,0 +1,327 @@
+[
+  {
+    "id": "01-drumroaster-coffee-gold-label",
+    "number": 1,
+    "name": "Drumroaster Coffee Gold Label",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/1.png",
+    "img_alt": "/bags/coffee-bag-01.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "02-kona-coffee-purveyors-mauna-loa-estate",
+    "number": 2,
+    "name": "Kona Coffee Purveyors Mauna Loa Estate",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/2.png",
+    "img_alt": "/bags/coffee-bag-02.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "03-timbertrain-caliber",
+    "number": 3,
+    "name": "Timbertrain Caliber",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/3.png",
+    "img_alt": "/bags/coffee-bag-03.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "04-pilot-coffee-roasters-heritage",
+    "number": 4,
+    "name": "Pilot Coffee Roasters Heritage",
+    "rating": 5,
+    "tags": [
+      "Aeropress",
+      "Espresso",
+      "Pourover"
+    ],
+    "img": "/bags/4.png",
+    "img_alt": "/bags/coffee-bag-04.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "05-timbertrain-sweet-thing",
+    "number": 5,
+    "name": "Timbertrain Sweet Thing",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/5.png",
+    "img_alt": "/bags/coffee-bag-05.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "06-timbertrain-cosmic-candy",
+    "number": 6,
+    "name": "Timbertrain Cosmic Candy",
+    "rating": 5,
+    "tags": [
+      "Batch",
+      "Espresso",
+      "Pourover"
+    ],
+    "img": "/bags/6.png",
+    "img_alt": "/bags/coffee-bag-06.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "07-nemesis-elias-parra-roa",
+    "number": 7,
+    "name": "Nemesis Elias Parra Roa",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/7.png",
+    "img_alt": "/bags/coffee-bag-07.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "08-modus-dom",
+    "number": 8,
+    "name": "Modus Dom",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/8.png",
+    "img_alt": "/bags/coffee-bag-08.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "09-bright-jenny-glitter-juice",
+    "number": 9,
+    "name": "Bright Jenny Glitter Juice",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/9.png",
+    "img_alt": "/bags/coffee-bag-09.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "10-onyx-honduras-kilverth-sagastume-natural",
+    "number": 10,
+    "name": "Onyx Honduras Kilverth Sagastume Natural",
+    "rating": 3,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/10.png",
+    "img_alt": "/bags/coffee-bag-10.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "11-agro-roasters-equinox-espresso",
+    "number": 11,
+    "name": "Agro Roasters Equinox Espresso",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/11.png",
+    "img_alt": "/bags/coffee-bag-11.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "12-odd-couple-poetic-justice",
+    "number": 12,
+    "name": "Odd Couple Poetic Justice",
+    "rating": 3,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/12.png",
+    "img_alt": "/bags/coffee-bag-12.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "13-luna-marshmallow-magic",
+    "number": 13,
+    "name": "Luna Marshmallow Magic",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/13.png",
+    "img_alt": "/bags/coffee-bag-13.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "14-tofino-coffee-huila-colombia",
+    "number": 14,
+    "name": "Tofino Coffee Huila Colombia",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/14.png",
+    "img_alt": "/bags/coffee-bag-14.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "15-rogue-wave-summer-solstice",
+    "number": 15,
+    "name": "Rogue Wave Summer Solstice",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/15.png",
+    "img_alt": "/bags/coffee-bag-15.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "16-slo-coffee-episode",
+    "number": 16,
+    "name": "Slo Coffee Episode",
+    "rating": 5,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/16.png",
+    "img_alt": "/bags/coffee-bag-16.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "17-dak-coffee-roasters-strawberry-kiss",
+    "number": 17,
+    "name": "Dak Coffee Roasters Strawberry Kiss",
+    "rating": 5,
+    "tags": [
+      "Aeropress",
+      "Pourover"
+    ],
+    "img": "/bags/17.png",
+    "img_alt": "/bags/coffee-bag-17.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "18-yardstick-sitio-kisbong",
+    "number": 18,
+    "name": "Yardstick Sitio Kisbong",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/18.png",
+    "img_alt": "/bags/coffee-bag-18.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "19-soon-coffee-so-good",
+    "number": 19,
+    "name": "Soon Coffee So Good",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/19.png",
+    "img_alt": "/bags/coffee-bag-19.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  },
+  {
+    "id": "20-house-of-funk-technicolour-espresso",
+    "number": 20,
+    "name": "House of Funk Technicolour Espresso",
+    "rating": 4,
+    "tags": [
+      "Espresso"
+    ],
+    "img": "/bags/20.png",
+    "img_alt": "/bags/coffee-bag-20.png",
+    "roaster": "",
+    "origin": "",
+    "process": "",
+    "notes": [],
+    "brew": ""
+  }
+]
