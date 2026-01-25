@@ -172,6 +172,7 @@ async function main() {
 
   // Initialize items with doubled sizes
   // Slightly larger sizes on mobile for better visibility
+  // Detect mobile once at the start
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const baseSize = isMobile ? 240 : 200; // Slightly larger base size on mobile
   const sizeRange = isMobile ? 20 : 16; // Slightly larger range on mobile
@@ -593,7 +594,6 @@ async function main() {
 
     // Render tiles in a grid around the center (larger radius to fill view)
     // Reduce radius significantly on mobile for better performance
-    const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const renderRadius = isMobile ? 1 : 3; // Render 1 tile on mobile, 3 on desktop
     const tilesToRender = [];
 
@@ -607,7 +607,6 @@ async function main() {
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
       // Smaller buffer on mobile for better performance
-      const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const buffer = isMobile ? 400 : 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
@@ -692,7 +691,6 @@ async function main() {
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
     // On mobile, throttle updates more aggressively for better performance
-    const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     // On mobile, update every 2nd frame when dragging, every frame when not dragging
     // This reduces the number of style updates significantly
     const shouldUpdate = !isMobile || (dragging && frameCount % 2 === 0) || !dragging;
@@ -1037,7 +1035,6 @@ async function main() {
     // Load markdown recipe
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
     overlay.classList.add("open");
-    renderPaused = true; // Pause grid rendering when modal is open
     renderPaused = true; // Pause grid rendering when modal is open
     
     // Scroll modal body to top
