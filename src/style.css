@@ -209,6 +209,9 @@ button.bag:focus{
     /* Reduce repaints during scroll */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Optimize scrolling performance */
+    scroll-behavior: auto; /* Disable smooth scroll for better performance */
+    -webkit-overflow-scrolling: touch;
   }
 }
 .titleRow{
@@ -302,6 +305,15 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   /* Performance optimization */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
+  /* Optimize text rendering */
+  text-rendering: optimizeSpeed; /* Prioritize speed over quality during scroll */
+  -webkit-font-smoothing: subpixel-antialiased; /* Faster than antialiased */
+}
+@media (max-width: 760px){
+  .recipeContent{
+    /* On mobile, use faster rendering */
+    text-rendering: optimizeSpeed;
+  }
 }
 @media (max-width: 760px){
   .recipeContent{
@@ -324,6 +336,9 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid rgba(0,0,0,.1);
+  /* Performance: use transform instead of border for better rendering */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 .recipeContent h2:first-child {
   margin-top: 0;
@@ -343,16 +358,25 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 
 .recipeContent p{
   margin: 12px 0;
+  /* Performance: prevent layout shifts */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .recipeContent ul,
 .recipeContent ol{
   margin: 12px 0;
   padding-left: 24px;
+  /* Performance: GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .recipeContent li{
   margin: 6px 0;
+  /* Performance: optimize rendering */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .recipeContent ul.nested{
@@ -380,6 +404,10 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   border-radius: 4px;
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 13px;
+  /* Performance: GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  display: inline-block;
 }
 @media (max-width: 760px){
   .recipeContent code{
@@ -394,6 +422,10 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   border-radius: 8px;
   overflow-x: auto;
   margin: 12px 0;
+  /* Performance: GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 .recipeContent pre code{
