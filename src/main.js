@@ -197,8 +197,8 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Reduce duplicates significantly on mobile for better performance
-  const duplicateCount = isMobile ? 1 : 3; // 1 duplicate on mobile, 3 on desktop
+  // Use 2 duplicates on mobile to ensure enough bags are visible
+  const duplicateCount = isMobile ? 2 : 3; // 2 duplicates on mobile, 3 on desktop
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -494,12 +494,12 @@ async function main() {
   const tileItems = await createTileLayout();
 
   // Initialize camera to center of first tile, accounting for viewport size
-  // On mobile, start slightly lower to show more bags at bottom
+  // On mobile, start camera lower (larger camY) to show more bags at bottom
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   camX = TILE_WIDTH / 2 - vw / 2;
-  // Start camera slightly higher on mobile to show more content at bottom
-  camY = TILE_HEIGHT / 2 - (isMobile ? vh / 3 : vh / 2);
+  // Start camera lower on mobile (subtract less from center) to show more content at bottom
+  camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
   targetCamX = camX;
   targetCamY = camY;
 
@@ -633,14 +633,14 @@ async function main() {
     // Render tiles in a grid around the center (larger radius to fill view)
     // Increase radius on mobile to ensure bags are visible at bottom
     const renderRadius = isMobile ? 2 : 3; // Render 2 tiles on mobile, 3 on desktop
-    // On mobile, render more tiles vertically to fill bottom of screen
     const tilesToRender = [];
     
-    // On mobile, extend render radius downward to show more bags at bottom
-    const radiusY = isMobile ? renderRadius + 1 : renderRadius; // Extra tile downward on mobile
+    // On mobile, extend render radius significantly downward to show more bags at bottom
+    const radiusYDown = isMobile ? renderRadius + 2 : renderRadius; // Extra tiles downward on mobile
+    const radiusYUp = renderRadius; // Same upward
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
-      for (let ty = tileY - renderRadius; ty <= tileY + radiusY; ty++) {
+      for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
         tilesToRender.push({ tx, ty });
       }
     }
