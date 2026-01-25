@@ -124,7 +124,9 @@ button.bag:focus{
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
-.overlay.open{ display:flex; }
+.overlay.open{ 
+  display:flex !important; /* Ensure modal shows when open class is added */
+}
 .modal{
   width:min(900px, 100%);
   max-height: calc(100vh - 48px);

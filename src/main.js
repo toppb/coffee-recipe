@@ -593,8 +593,8 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Reduce radius significantly on mobile for better performance
-    const renderRadius = isMobile ? 1 : 3; // Render 1 tile on mobile, 3 on desktop
+    // Reduce radius on mobile for better performance, but not too much to avoid cut-off
+    const renderRadius = isMobile ? 2 : 3; // Render 2 tiles on mobile, 3 on desktop
     const tilesToRender = [];
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
@@ -1034,7 +1034,9 @@ async function main() {
 
     // Load markdown recipe
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
+    // Show modal first, then pause rendering
     overlay.classList.add("open");
+    overlay.style.display = "flex"; // Ensure it's visible
     renderPaused = true; // Pause grid rendering when modal is open
     
     // Scroll modal body to top
@@ -1107,6 +1109,7 @@ async function main() {
 
   function closeModal() {
     overlay.classList.remove("open");
+    overlay.style.display = "none"; // Ensure it's hidden
     renderPaused = false; // Resume grid rendering when modal closes
   }
 
