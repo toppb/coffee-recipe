@@ -171,21 +171,27 @@ async function main() {
   const COLS = 6; // Number of columns in the tile
 
   // Initialize items with doubled sizes
+  // Larger sizes on mobile for better visibility
+  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const baseSize = isMobile ? 280 : 200; // Larger base size on mobile
+  const sizeRange = isMobile ? 24 : 16; // Larger range on mobile
+  
   const baseItems = data.map((d) => {
     const number = Number(d.number);
     return {
       ...d,
       number,
       img: imgFor(number),
-      // Doubled size - around 200-232px
-      size: 200 + (number % 3) * 16, // 200-232px range
+      // Doubled size - around 200-232px on desktop, 280-304px on mobile
+      size: baseSize + (number % 3) * sizeRange,
     };
   });
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Create 3 variations of each item with slight position offsets
-  for (let i = 0; i < 3; i++) {
+  // Reduce duplicates on mobile for better performance
+  const duplicateCount = isMobile ? 2 : 3; // 2 duplicates on mobile, 3 on desktop
+  for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
         ...item,
@@ -558,8 +564,10 @@ async function main() {
   // Render function - creates/updates visible clones
   let lastTileX = Infinity;
   let lastTileY = Infinity;
+  let frameCount = 0; // For frame-based throttling on mobile
 
   function render() {
+    frameCount++;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -589,7 +597,9 @@ async function main() {
     // Only remove/create clones when not dragging or when tile changed
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      const buffer = 800;
+      // Smaller buffer on mobile for better performance
+      const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const buffer = isMobile ? 400 : 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
@@ -672,16 +682,22 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    activeClones.forEach((clone) => {
-      const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-      const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+    // On mobile, throttle updates during drag for better performance
+    const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const shouldUpdate = !isMobile || !dragging || (frameCount % 2 === 0); // Update every other frame on mobile during drag
+    
+    if (shouldUpdate) {
+      activeClones.forEach((clone) => {
+        const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+        const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
 
-      const screenX = worldX - camX;
-      const screenY = worldY - camY;
+        const screenX = worldX - camX;
+        const screenY = worldY - camY;
 
-      // Browser handles sub-pixel rendering automatically
-      clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-    });
+        // Browser handles sub-pixel rendering automatically
+        clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+      });
+    }
 
     requestAnimationFrame(render);
   }
@@ -737,7 +753,8 @@ async function main() {
     targetCamY = camY;
     stage.classList.add("dragging");
     stage.setPointerCapture(e.pointerId);
-  });
+    e.preventDefault(); // Prevent default touch behavior on mobile
+  }, { passive: false });
 
   stage.addEventListener("pointermove", (e) => {
     if (!dragging) return;
@@ -758,7 +775,7 @@ async function main() {
 
     lastX = e.clientX;
     lastY = e.clientY;
-  });
+  }, { passive: true });
 
   stage.addEventListener("pointerup", (e) => {
     dragging = false;
@@ -766,7 +783,7 @@ async function main() {
     stage.releasePointerCapture(e.pointerId);
     updateStageCursor(); // Update cursor state after drag ends
     setTimeout(() => (movedDuringDrag = false), 100);
-  });
+  }, { passive: true });
 
   // Scroll wheel navigation
   stage.addEventListener("wheel", (e) => {
