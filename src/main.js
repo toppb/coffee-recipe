@@ -172,6 +172,10 @@ async function main() {
   let dragStartX = 0;
   let dragStartY = 0;
   let lastDragEndTime = 0;
+  // Track bag tap positions for better click detection
+  let bagTapStartX = 0;
+  let bagTapStartY = 0;
+  let bagTapStartTime = 0;
 
   // Initialize items with doubled sizes
   // Slightly larger sizes on mobile for better visibility
@@ -527,15 +531,26 @@ async function main() {
       // Ensure cursor is set on cloned elements
       setupBagCursor(el);
       // Re-attach event listener (cloneNode doesn't copy event listeners)
-      el.addEventListener("click", (e) => {
+      // Use pointer events for better mobile support
+      el.addEventListener("pointerdown", (e) => {
+        bagTapStartX = e.clientX;
+        bagTapStartY = e.clientY;
+        bagTapStartTime = Date.now();
+      }, { passive: true });
+      
+      el.addEventListener("pointerup", (e) => {
         e.stopPropagation();
-        e.preventDefault();
-        // Check if this was a click, not a drag
-        const timeSinceDragEnd = Date.now() - (lastDragEndTime || 0);
-        if (!movedDuringDrag || timeSinceDragEnd > 200) {
+        const dx = Math.abs(e.clientX - bagTapStartX);
+        const dy = Math.abs(e.clientY - bagTapStartY);
+        const timeDiff = Date.now() - bagTapStartTime;
+        const distance = dx + dy;
+        
+        // If tap was quick (< 300ms) and movement was small (< 10px), treat as click
+        if (timeDiff < 300 && distance < 10 && !dragging) {
+          e.preventDefault();
           openModal(item);
         }
-      });
+      }, { passive: false });
       return el;
     }
 
@@ -553,15 +568,27 @@ async function main() {
 
     el.appendChild(img);
     setupBagCursor(el);
-    el.addEventListener("click", (e) => {
+    
+    // Use pointer events for better mobile support
+    el.addEventListener("pointerdown", (e) => {
+      bagTapStartX = e.clientX;
+      bagTapStartY = e.clientY;
+      bagTapStartTime = Date.now();
+    }, { passive: true });
+    
+    el.addEventListener("pointerup", (e) => {
       e.stopPropagation();
-      e.preventDefault();
-      // Check if this was a click, not a drag
-      const timeSinceDragEnd = Date.now() - (lastDragEndTime || 0);
-      if (!movedDuringDrag || timeSinceDragEnd > 200) {
+      const dx = Math.abs(e.clientX - bagTapStartX);
+      const dy = Math.abs(e.clientY - bagTapStartY);
+      const timeDiff = Date.now() - bagTapStartTime;
+      const distance = dx + dy;
+      
+      // If tap was quick (< 300ms) and movement was small (< 10px), treat as click
+      if (timeDiff < 300 && distance < 10 && !dragging) {
+        e.preventDefault();
         openModal(item);
       }
-    });
+    }, { passive: false });
 
     itemElements.set(key, el);
     return el;
@@ -756,7 +783,7 @@ async function main() {
 
   // Drag handlers
   stage.addEventListener("pointerdown", (e) => {
-    // Don't start dragging if clicking on a bag button
+    // Don't start dragging if clicking on a bag button - let bag handle it
     if (e.target.closest('.bag')) {
       return;
     }
