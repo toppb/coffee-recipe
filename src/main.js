@@ -171,10 +171,10 @@ async function main() {
   const COLS = 6; // Number of columns in the tile
 
   // Initialize items with doubled sizes
-  // Larger sizes on mobile for better visibility
+  // Slightly larger sizes on mobile for better visibility
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const baseSize = isMobile ? 280 : 200; // Larger base size on mobile
-  const sizeRange = isMobile ? 24 : 16; // Larger range on mobile
+  const baseSize = isMobile ? 240 : 200; // Slightly larger base size on mobile
+  const sizeRange = isMobile ? 20 : 16; // Slightly larger range on mobile
   
   const baseItems = data.map((d) => {
     const number = Number(d.number);

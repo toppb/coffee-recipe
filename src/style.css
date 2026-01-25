@@ -187,13 +187,13 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 .meta{ margin: 6px 0 14px; color: var(--muted); font-size: 13px; }
 @media (max-width: 760px){
   #mTitle{
-    font-size: 32px;
+    font-size: 28px;
   }
   h2{
-    font-size: 24px;
+    font-size: 22px;
   }
   .meta{
-    font-size: 15px;
+    font-size: 14px;
   }
 }
 
@@ -206,7 +206,7 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .sectionTitle{
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 .tagsWrapper {
@@ -231,8 +231,8 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .pill{
-    font-size: 14px;
-    padding: 9px 14px;
+    font-size: 13px;
+    padding: 8px 12px;
   }
 }
 .brew{
@@ -243,7 +243,7 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .brew{
-    font-size: 16px;
+    font-size: 15px;
     line-height: 1.5;
   }
 }
@@ -256,7 +256,7 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .recipeContent{
-    font-size: 16px;
+    font-size: 15px;
     line-height: 1.7;
   }
 }
@@ -283,13 +283,13 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 .recipeContent h3{ font-size: 18px; }
 @media (max-width: 760px){
-  .recipeContent h1{ font-size: 28px; }
+  .recipeContent h1{ font-size: 26px; }
   .recipeContent h2{ 
-    font-size: 24px; 
-    margin-top: 28px;
-    padding-top: 24px;
+    font-size: 22px; 
+    margin-top: 24px;
+    padding-top: 20px;
   }
-  .recipeContent h3{ font-size: 20px; }
+  .recipeContent h3{ font-size: 19px; }
 }
 
 .recipeContent p{
@@ -334,8 +334,8 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .recipeContent code{
-    font-size: 15px;
-    padding: 3px 8px;
+    font-size: 14px;
+    padding: 2px 7px;
   }
 }
 
@@ -406,8 +406,8 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 }
 @media (max-width: 760px){
   .instruction{
-    font-size: 16px;
-    padding: 14px 20px;
+    font-size: 15px;
+    padding: 12px 18px;
   }
 }
 @media (max-width: 760px){
