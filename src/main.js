@@ -497,7 +497,6 @@ async function main() {
   // On mobile, start slightly lower to show more bags at bottom
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   camX = TILE_WIDTH / 2 - vw / 2;
   // Start camera slightly higher on mobile to show more content at bottom
   camY = TILE_HEIGHT / 2 - (isMobile ? vh / 3 : vh / 2);
