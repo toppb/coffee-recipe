@@ -178,11 +178,11 @@ async function main() {
   let bagTapStartTime = 0;
 
   // Initialize items with doubled sizes
-  // Slightly larger sizes on mobile for better visibility
+  // Smaller sizes on mobile to fit more bags
   // Detect mobile once at the start
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const baseSize = isMobile ? 240 : 200; // Slightly larger base size on mobile
-  const sizeRange = isMobile ? 20 : 16; // Slightly larger range on mobile
+  const baseSize = isMobile ? 220 : 200; // Smaller base size on mobile
+  const sizeRange = isMobile ? 18 : 16; // Smaller range on mobile
   
   const baseItems = data.map((d) => {
     const number = Number(d.number);
@@ -494,10 +494,13 @@ async function main() {
   const tileItems = await createTileLayout();
 
   // Initialize camera to center of first tile, accounting for viewport size
+  // On mobile, start slightly lower to show more bags at bottom
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   camX = TILE_WIDTH / 2 - vw / 2;
-  camY = TILE_HEIGHT / 2 - vh / 2;
+  // Start camera slightly higher on mobile to show more content at bottom
+  camY = TILE_HEIGHT / 2 - (isMobile ? vh / 3 : vh / 2);
   targetCamX = camX;
   targetCamY = camY;
 
@@ -629,13 +632,16 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Use larger radius on mobile to ensure bags are visible, but throttle updates
+    // Increase radius on mobile to ensure bags are visible at bottom
     const renderRadius = isMobile ? 2 : 3; // Render 2 tiles on mobile, 3 on desktop
-    // On mobile, ensure we render enough tiles to fill the viewport
+    // On mobile, render more tiles vertically to fill bottom of screen
     const tilesToRender = [];
+    
+    // On mobile, extend render radius downward to show more bags at bottom
+    const radiusY = isMobile ? renderRadius + 1 : renderRadius; // Extra tile downward on mobile
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
-      for (let ty = tileY - renderRadius; ty <= tileY + renderRadius; ty++) {
+      for (let ty = tileY - renderRadius; ty <= tileY + radiusY; ty++) {
         tilesToRender.push({ tx, ty });
       }
     }
