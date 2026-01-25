@@ -150,6 +150,13 @@ async function main() {
     body.appendChild(stage);
   }
 
+  // Tile dimensions - smaller for more frequent duplication
+  // Must be declared before camera position initialization
+  const TILE_WIDTH = 1800;
+  const TILE_HEIGHT = 2400;
+  const GUTTER = 75; // Spacing between items (increased for more gap)
+  const COLS = 6; // Number of columns in the tile
+
   // Camera position (world-space)
   // Start camera at center of first tile for better initial view
   let camX = TILE_WIDTH / 2;
@@ -165,12 +172,6 @@ async function main() {
   let dragStartX = 0;
   let dragStartY = 0;
   let lastDragEndTime = 0;
-
-  // Tile dimensions - smaller for more frequent duplication
-  const TILE_WIDTH = 1800;
-  const TILE_HEIGHT = 2400;
-  const GUTTER = 75; // Spacing between items (increased for more gap)
-  const COLS = 6; // Number of columns in the tile
 
   // Initialize items with doubled sizes
   // Slightly larger sizes on mobile for better visibility
