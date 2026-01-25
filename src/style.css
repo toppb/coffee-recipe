@@ -302,9 +302,7 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   font-size: 14px;
   line-height: 1.6;
   color: rgba(0,0,0,.82);
-  /* Performance optimization */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
+  /* Performance optimization - remove transforms that cause repaints */
   /* Optimize text rendering */
   text-rendering: optimizeSpeed; /* Prioritize speed over quality during scroll */
   -webkit-font-smoothing: subpixel-antialiased; /* Faster than antialiased */
@@ -336,9 +334,6 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid rgba(0,0,0,.1);
-  /* Performance: use transform instead of border for better rendering */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 .recipeContent h2:first-child {
   margin-top: 0;
@@ -422,10 +417,6 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   border-radius: 8px;
   overflow-x: auto;
   margin: 12px 0;
-  /* Performance: GPU acceleration */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  will-change: scroll-position;
 }
 
 .recipeContent pre code{

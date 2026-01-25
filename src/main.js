@@ -189,8 +189,8 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Reduce duplicates on mobile for better performance
-  const duplicateCount = isMobile ? 2 : 3; // 2 duplicates on mobile, 3 on desktop
+  // Reduce duplicates significantly on mobile for better performance
+  const duplicateCount = isMobile ? 1 : 3; // 1 duplicate on mobile, 3 on desktop
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -565,8 +565,15 @@ async function main() {
   let lastTileX = Infinity;
   let lastTileY = Infinity;
   let frameCount = 0; // For frame-based throttling on mobile
+  let renderPaused = false; // Pause rendering when modal is open
 
   function render() {
+    // Skip rendering when modal is open for better scroll performance
+    if (renderPaused) {
+      requestAnimationFrame(render);
+      return;
+    }
+    
     frameCount++;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -585,7 +592,9 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    const renderRadius = 3; // Render 3 tiles in each direction to fill the view
+    // Reduce radius significantly on mobile for better performance
+    const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const renderRadius = isMobile ? 1 : 3; // Render 1 tile on mobile, 3 on desktop
     const tilesToRender = [];
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
@@ -682,9 +691,11 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    // On mobile, throttle updates during drag for better performance
+    // On mobile, throttle updates more aggressively for better performance
     const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const shouldUpdate = !isMobile || !dragging || (frameCount % 2 === 0); // Update every other frame on mobile during drag
+    // On mobile, update every 2nd frame when dragging, every frame when not dragging
+    // This reduces the number of style updates significantly
+    const shouldUpdate = !isMobile || (dragging && frameCount % 2 === 0) || !dragging;
     
     if (shouldUpdate) {
       activeClones.forEach((clone) => {
@@ -1026,6 +1037,8 @@ async function main() {
     // Load markdown recipe
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
     overlay.classList.add("open");
+    renderPaused = true; // Pause grid rendering when modal is open
+    renderPaused = true; // Pause grid rendering when modal is open
     
     // Scroll modal body to top
     const modalBody = overlay.querySelector(".modalBody");
@@ -1097,6 +1110,7 @@ async function main() {
 
   function closeModal() {
     overlay.classList.remove("open");
+    renderPaused = false; // Resume grid rendering when modal closes
   }
 
   mClose.addEventListener("click", closeModal);
