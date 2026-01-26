@@ -528,7 +528,7 @@ async function main() {
   } else {
     // Fallback to tile center
     camX = TILE_WIDTH / 2 - vw / 2;
-    camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
+    camY = TILE_HEIGHT / 2 - vh / 2;
   }
   
   targetCamX = camX;
@@ -662,14 +662,13 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Increase radius on mobile to pre-render more tiles and prevent gaps
-    const renderRadius = isMobile ? 2 : 3;
+    // Same render radius for desktop and mobile
+    const renderRadius = 3;
     const tilesToRender = [];
     
-    // Extend render radius downward on mobile to prevent gaps when dragging down
-    // But keep it reasonable for performance
-    const radiusYDown = isMobile ? renderRadius + 4 : renderRadius + 1;
-    const radiusYUp = isMobile ? renderRadius + 1 : renderRadius;
+    // Same render radius extension for desktop and mobile
+    const radiusYDown = renderRadius + 1;
+    const radiusYUp = renderRadius;
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
       for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
@@ -765,10 +764,8 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    // On mobile, throttle updates more aggressively for better performance during drag
-    // On mobile, update every 3rd frame when dragging, every frame when not dragging
-    // This significantly reduces the number of style updates during drag
-    const shouldUpdate = !isMobile || (dragging && frameCount % 3 === 0) || !dragging;
+    // Same update behavior for desktop and mobile
+    const shouldUpdate = true;
     
     if (shouldUpdate) {
       // During drag, only update clones that are visible or near viewport for better performance
