@@ -663,12 +663,13 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Increase radius significantly on mobile to prevent gaps when dragging
-    const renderRadius = isMobile ? 3 : 3;
+    // Increase radius on mobile to pre-render more tiles and prevent gaps
+    const renderRadius = isMobile ? 2 : 3;
     const tilesToRender = [];
     
-    // Extend render radius significantly downward on mobile to prevent gaps when dragging down
-    const radiusYDown = isMobile ? renderRadius + 5 : renderRadius + 1; // Much larger downward radius on mobile
+    // Extend render radius downward on mobile to prevent gaps when dragging down
+    // But keep it reasonable for performance
+    const radiusYDown = isMobile ? renderRadius + 4 : renderRadius + 1;
     const radiusYUp = isMobile ? renderRadius + 1 : renderRadius;
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
@@ -677,15 +678,12 @@ async function main() {
       }
     }
 
-    // On mobile, always create clones to prevent gaps, even during drag
-    // On desktop, throttle clone creation/removal during drag for performance
-    const shouldRemoveClones = !isDragging || tileChanged || isMobile; // Always update on mobile
-    const shouldCreateClones = !isDragging || tileChanged || isMobile; // Always create on mobile
-    
-    if (shouldRemoveClones) {
+    // Create/remove clones when tile changes or when not dragging
+    // On mobile, also update when tile changes during drag to prevent gaps
+    if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Very large buffer on mobile during drag to prevent gaps
-      const buffer = (isMobile && isDragging) ? 1500 : (isDragging ? 1000 : 800);
+      // Larger buffer on mobile to prevent gaps
+      const buffer = isMobile ? 1000 : 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
@@ -714,10 +712,8 @@ async function main() {
       for (let i = clonesToRemove.length - 1; i >= 0; i--) {
         activeClones.splice(clonesToRemove[i], 1);
       }
-    }
 
-    // Always create clones on mobile, even during drag, to prevent gaps
-    if (shouldCreateClones) {
+      // Create new clones for visible tiles
       tilesToRender.forEach(({ tx, ty }) => {
         tileItems.forEach((item) => {
           const worldX = item.x + tx * TILE_WIDTH;
