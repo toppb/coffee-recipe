@@ -661,13 +661,14 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Increase radius on mobile to ensure bags are visible at bottom
-    const renderRadius = isMobile ? 2 : 3; // Render 2 tiles on mobile, 3 on desktop
+    // Reduce radius during drag on mobile for better performance
+    const renderRadius = isMobile ? (isDragging ? 1 : 2) : 3; // Smaller radius during drag on mobile
     const tilesToRender = [];
     
     // On mobile, extend render radius significantly downward to show more bags at bottom
-    const radiusYDown = isMobile ? renderRadius + 3 : renderRadius; // 3 extra tiles downward on mobile
-    const radiusYUp = isMobile ? renderRadius + 1 : renderRadius; // 1 extra tile upward on mobile
+    // But reduce during drag for better performance
+    const radiusYDown = isMobile ? (isDragging ? renderRadius + 1 : renderRadius + 3) : renderRadius;
+    const radiusYUp = isMobile ? (isDragging ? renderRadius : renderRadius + 1) : renderRadius;
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
       for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
@@ -676,8 +677,8 @@ async function main() {
     }
 
     // Always create/remove clones when tile changes, or when not dragging
-    // On mobile, always update during drag to prevent gaps
-    if (!isDragging || tileChanged || isMobile) {
+    // Skip clone creation/removal during drag for better performance
+    if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
       // Larger buffer on mobile to prevent gaps when dragging
       const buffer = isMobile ? 800 : 800; // Same buffer on mobile to prevent gaps
@@ -763,10 +764,10 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    // On mobile, throttle updates more aggressively for better performance
-    // On mobile, update every 2nd frame when dragging, every frame when not dragging
-    // This reduces the number of style updates significantly
-    const shouldUpdate = !isMobile || (dragging && frameCount % 2 === 0) || !dragging;
+    // On mobile, throttle updates more aggressively for better performance during drag
+    // On mobile, update every 3rd frame when dragging, every frame when not dragging
+    // This significantly reduces the number of style updates during drag
+    const shouldUpdate = !isMobile || (dragging && frameCount % 3 === 0) || !dragging;
     
     if (shouldUpdate) {
       activeClones.forEach((clone) => {
