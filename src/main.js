@@ -218,7 +218,9 @@ async function main() {
   // Create masonry layout within a tile
   // We'll create a promise-based layout that waits for images to load
   async function createTileLayout() {
-    const padding = 40;
+    // Reduce padding, especially vertically, to prevent gaps between tiles
+    // Use minimal padding on mobile where gaps are more noticeable
+    const padding = isMobile ? 10 : 20; // Much smaller padding to reduce gaps
     const placeW = TILE_WIDTH - padding * 2;
     const placeH = TILE_HEIGHT - padding * 2;
     const colWidth = (placeW - (COLS - 1) * GUTTER) / COLS;
