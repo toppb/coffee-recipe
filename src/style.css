@@ -201,8 +201,8 @@ button.bag:focus{
   }
   .modalBody{
     min-height: 0;
-    padding: 20px 16px;
-    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px); /* Account for safe area */
+    padding: 28px 24px;
+    padding-bottom: max(28px, env(safe-area-inset-bottom, 0px) + 28px); /* Account for safe area */
     flex: 1 1 auto;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
