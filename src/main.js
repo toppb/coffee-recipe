@@ -156,7 +156,7 @@ async function main() {
   const TILE_HEIGHT = 2400;
   // Detect mobile once at the start for use in layout calculations
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const GUTTER = isMobile ? 50 : 75; // Smaller spacing on mobile to show more bags, original on desktop
+  const GUTTER = isMobile ? 35 : 55; // Reduced gutter gap to bring columns closer together
   const COLS = 6; // Number of columns in the tile
 
   // Camera position (world-space)
