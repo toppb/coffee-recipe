@@ -493,13 +493,42 @@ async function main() {
   // Wait for layout to be created
   const tileItems = await createTileLayout();
 
-  // Initialize camera to center of first tile, accounting for viewport size
-  // On mobile, start camera lower (larger camY) to show more bags at bottom
+  // Initialize camera to center on a specific bag for a nicer initial view
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  camX = TILE_WIDTH / 2 - vw / 2;
-  // Start camera lower on mobile (subtract less from center) to show more content at bottom
-  camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
+  
+  // Find a bag positioned around the middle of the tile to center on
+  // Pick a bag that's not too close to the edges
+  let centerBag = null;
+  const centerX = TILE_WIDTH / 2;
+  const centerY = TILE_HEIGHT / 2;
+  let minDistance = Infinity;
+  
+  // Find the bag closest to the center of the tile
+  for (const item of tileItems) {
+    const bagCenterX = item.x + item.width / 2;
+    const bagCenterY = item.y + item.height / 2;
+    const distance = Math.sqrt(
+      Math.pow(bagCenterX - centerX, 2) + Math.pow(bagCenterY - centerY, 2)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      centerBag = item;
+    }
+  }
+  
+  // If we found a bag, center on it; otherwise fall back to tile center
+  if (centerBag) {
+    const bagCenterX = centerBag.x + centerBag.width / 2;
+    const bagCenterY = centerBag.y + centerBag.height / 2;
+    camX = bagCenterX - vw / 2;
+    camY = bagCenterY - vh / 2;
+  } else {
+    // Fallback to tile center
+    camX = TILE_WIDTH / 2 - vw / 2;
+    camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
+  }
+  
   targetCamX = camX;
   targetCamY = camY;
 
