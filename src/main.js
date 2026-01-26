@@ -662,7 +662,7 @@ async function main() {
 
     // Render tiles in a grid around the center (larger radius to fill view)
     // Reduce radius during drag on mobile for better performance
-    const renderRadius = isMobile ? (isDragging ? 1 : 2) : 3; // Smaller radius during drag on mobile
+    const renderRadius = isMobile ? (isDragging ? 1 : 2) : 3; // Minimal radius during drag on mobile
     const tilesToRender = [];
     
     // On mobile, extend render radius significantly downward to show more bags at bottom
@@ -680,8 +680,8 @@ async function main() {
     // Skip clone creation/removal during drag for better performance
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Larger buffer on mobile to prevent gaps when dragging
-      const buffer = isMobile ? 800 : 800; // Same buffer on mobile to prevent gaps
+      // Reduce buffer during drag for better performance
+      const buffer = (isMobile && isDragging) ? 400 : 800; // Smaller buffer during drag
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
@@ -764,13 +764,25 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    // On mobile, throttle updates more aggressively for better performance during drag
-    // On mobile, update every 3rd frame when dragging, every frame when not dragging
+    // On mobile, throttle updates very aggressively for better performance during drag
+    // On mobile, update every 4th frame when dragging, every frame when not dragging
     // This significantly reduces the number of style updates during drag
-    const shouldUpdate = !isMobile || (dragging && frameCount % 3 === 0) || !dragging;
+    const shouldUpdate = !isMobile || (dragging && frameCount % 4 === 0) || !dragging;
     
     if (shouldUpdate) {
-      activeClones.forEach((clone) => {
+      // During drag, only update visible clones (skip off-screen ones)
+      const updateClones = dragging && isMobile 
+        ? activeClones.filter((clone) => {
+            const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+            const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+            const screenX = worldX - camX;
+            const screenY = worldY - camY;
+            // Only update clones that are visible or near viewport
+            return screenX > -200 && screenX < vw + 200 && screenY > -200 && screenY < vh + 200;
+          })
+        : activeClones;
+      
+      updateClones.forEach((clone) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
         const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
 
