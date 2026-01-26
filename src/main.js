@@ -181,8 +181,8 @@ async function main() {
   // Smaller sizes on mobile to fit more bags
   // Detect mobile once at the start
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const baseSize = isMobile ? 170 : 140; // Further reduced sizes to show more bags around center
-  const sizeRange = isMobile ? 14 : 12; // Further reduced size range
+  const baseSize = isMobile ? 190 : 200; // Smaller on mobile to show more bags, original size on desktop
+  const sizeRange = isMobile ? 15 : 16; // Smaller range on mobile, original on desktop
   
   const baseItems = data.map((d) => {
     const number = Number(d.number);
