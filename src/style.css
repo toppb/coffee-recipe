@@ -117,7 +117,7 @@ button.bag:focus{
   display:none;
   align-items:center;
   justify-content:center;
-  padding: 24px;
+  padding: 0; /* Remove padding, handle spacing via modal margin instead */
   overflow: hidden;
   z-index: 2000;
   visibility: hidden;
@@ -131,19 +131,24 @@ button.bag:focus{
   display:flex !important; /* Ensure modal shows when open class is added */
   visibility: visible !important;
   opacity: 1 !important;
+  align-items: center !important; /* Ensure vertical centering */
+  justify-content: center !important; /* Ensure horizontal centering */
+  padding: 0 !important; /* No padding to ensure proper centering */
 }
 .modal{
-  width:min(900px, 100%);
-  max-height: calc(100vh - 48px);
+  width:min(900px, calc(100% - 48px)); /* 24px margin on each side */
+  max-height: calc(100vh - 48px); /* 24px margin on top and bottom */
   max-height: calc(100dvh - 48px); /* Dynamic viewport height for mobile Safari */
+  height: auto; /* Allow modal to size based on content, up to max-height */
   background:#fff;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow:hidden;
   display:grid;
   grid-template-columns: 340px 1fr;
-  grid-template-rows: 1fr;
+  grid-template-rows: minmax(0, 1fr); /* Prevent grid from expanding beyond container */
   box-sizing: border-box;
+  margin: 24px; /* Equal margin on all sides for centering */
   /* Performance optimization */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
@@ -151,11 +156,15 @@ button.bag:focus{
 }
 @media (max-width: 760px){
   .overlay{
-    padding: 12px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px) + 12px); /* Account for safe area at bottom */
+    padding: 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px); /* Account for safe area at bottom */
     height: 100dvh;
     box-sizing: border-box;
     align-items: stretch; /* Make modal fill available height */
+  }
+  .overlay.open{
+    padding: 24px !important; /* Restore padding for mobile when open */
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px) !important;
   }
   .modal{ 
     grid-template-columns: 1fr;
@@ -165,7 +174,7 @@ button.bag:focus{
     width: 100%;
     display: flex;
     flex-direction: column;
-    margin: 0;
+    margin: 0; /* No margin on mobile since overlay has padding */
   }
 }
 .modalMedia{
@@ -187,6 +196,7 @@ button.bag:focus{
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  max-height: 100%; /* Constrain to modal height */
   display: flex;
   flex-direction: column;
   /* Performance optimizations */
