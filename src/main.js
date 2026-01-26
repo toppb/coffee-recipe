@@ -764,19 +764,20 @@ async function main() {
 
     // Always update positions (this is fast - just transform updates)
     // Use sub-pixel precision for smoother rendering
-    // Same update behavior for desktop and mobile
-    const shouldUpdate = true;
+    // Optimize updates during drag for better performance
+    // During drag, throttle updates slightly and only update visible clones when many exist
+    const shouldUpdate = !dragging || frameCount % 2 === 0; // Update every other frame during drag
     
     if (shouldUpdate) {
       // During drag, only update clones that are visible or near viewport for better performance
-      // This prevents updating hundreds of off-screen clones
-      const clonesToUpdate = dragging && activeClones.length > 50
+      // Lower threshold to improve performance even with fewer clones
+      const clonesToUpdate = dragging && activeClones.length > 30
         ? activeClones.filter((clone) => {
             const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
             const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
             const screenX = worldX - camX;
             const screenY = worldY - camY;
-            // Only update clones within viewport + margin
+            // Only update clones within viewport + margin (2x viewport for smooth transitions)
             return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
           })
         : activeClones;
