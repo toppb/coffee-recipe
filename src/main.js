@@ -521,11 +521,14 @@ async function main() {
   if (centerBag) {
     const bagCenterX = centerBag.x + centerBag.width / 2;
     const bagCenterY = centerBag.y + centerBag.height / 2;
-    camX = bagCenterX - vw / 2;
+    // On mobile, use a wider effective viewport to show more bags horizontally (zoom out effect)
+    const effectiveVw = isMobile ? vw * 1.4 : vw; // Show 40% more width on mobile (zoom out)
+    camX = bagCenterX - effectiveVw / 2;
     camY = bagCenterY - vh / 2;
   } else {
     // Fallback to tile center
-    camX = TILE_WIDTH / 2 - vw / 2;
+    const effectiveVw = isMobile ? vw * 1.4 : vw; // Show 40% more width on mobile (zoom out)
+    camX = TILE_WIDTH / 2 - effectiveVw / 2;
     camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
   }
   
