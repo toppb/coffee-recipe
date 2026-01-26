@@ -661,13 +661,13 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Reduce radius during drag on mobile for better performance
-    const renderRadius = isMobile ? (isDragging ? 1 : 2) : 3; // Minimal radius during drag on mobile
+    // Keep sufficient radius even during drag to prevent gaps
+    const renderRadius = isMobile ? (isDragging ? 2 : 2) : 3; // Keep radius during drag to prevent gaps
     const tilesToRender = [];
     
-    // On mobile, extend render radius significantly downward to show more bags at bottom
-    // But reduce during drag for better performance
-    const radiusYDown = isMobile ? (isDragging ? renderRadius + 1 : renderRadius + 3) : renderRadius;
+    // Extend render radius significantly downward to prevent gaps when dragging down
+    // Increase downward radius during drag to pre-render tiles ahead
+    const radiusYDown = isMobile ? (isDragging ? renderRadius + 4 : renderRadius + 3) : (isDragging ? renderRadius + 2 : renderRadius);
     const radiusYUp = isMobile ? (isDragging ? renderRadius : renderRadius + 1) : renderRadius;
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
@@ -680,8 +680,8 @@ async function main() {
     // Skip clone creation/removal during drag for better performance
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Larger buffer on mobile to prevent gaps when dragging
-      const buffer = isMobile ? 800 : 800; // Same buffer on mobile to prevent gaps
+      // Increase buffer during drag to prevent gaps, especially when dragging down
+      const buffer = (isMobile && isDragging) ? 1200 : (isDragging ? 1000 : 800); // Larger buffer during drag
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
