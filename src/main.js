@@ -636,8 +636,8 @@ async function main() {
     const tilesToRender = [];
     
     // On mobile, extend render radius significantly downward to show more bags at bottom
-    const radiusYDown = isMobile ? renderRadius + 2 : renderRadius; // Extra tiles downward on mobile
-    const radiusYUp = renderRadius; // Same upward
+    const radiusYDown = isMobile ? renderRadius + 3 : renderRadius; // 3 extra tiles downward on mobile
+    const radiusYUp = isMobile ? renderRadius + 1 : renderRadius; // 1 extra tile upward on mobile
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
       for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
@@ -645,11 +645,12 @@ async function main() {
       }
     }
 
-    // Only remove/create clones when not dragging or when tile changed
-    if (!isDragging || tileChanged) {
+    // Always create/remove clones when tile changes, or when not dragging
+    // On mobile, always update during drag to prevent gaps
+    if (!isDragging || tileChanged || isMobile) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Smaller buffer on mobile for better performance
-      const buffer = isMobile ? 400 : 800;
+      // Larger buffer on mobile to prevent gaps when dragging
+      const buffer = isMobile ? 800 : 800; // Same buffer on mobile to prevent gaps
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
