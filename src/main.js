@@ -154,7 +154,9 @@ async function main() {
   // Must be declared before camera position initialization
   const TILE_WIDTH = 1800;
   const TILE_HEIGHT = 2400;
-  const GUTTER = 75; // Spacing between items (increased for more gap)
+  // Detect mobile once at the start for use in layout calculations
+  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const GUTTER = isMobile ? 50 : 75; // Smaller spacing on mobile to show more bags, original on desktop
   const COLS = 6; // Number of columns in the tile
 
   // Camera position (world-space)
@@ -179,8 +181,6 @@ async function main() {
 
   // Initialize items with doubled sizes
   // Smaller sizes on mobile to fit more bags
-  // Detect mobile once at the start
-  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const baseSize = isMobile ? 190 : 200; // Smaller on mobile to show more bags, original size on desktop
   const sizeRange = isMobile ? 15 : 16; // Smaller range on mobile, original on desktop
   
