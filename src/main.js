@@ -661,14 +661,12 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Keep sufficient radius even during drag to prevent gaps
-    const renderRadius = isMobile ? (isDragging ? 2 : 2) : 3; // Keep radius during drag to prevent gaps
+    const renderRadius = isMobile ? 2 : 3;
     const tilesToRender = [];
     
-    // Extend render radius significantly downward to prevent gaps when dragging down
-    // Increase downward radius during drag to pre-render tiles ahead
-    const radiusYDown = isMobile ? (isDragging ? renderRadius + 4 : renderRadius + 3) : (isDragging ? renderRadius + 2 : renderRadius);
-    const radiusYUp = isMobile ? (isDragging ? renderRadius : renderRadius + 1) : renderRadius;
+    // Extend render radius downward to prevent gaps when dragging down
+    const radiusYDown = isMobile ? renderRadius + 3 : renderRadius + 1;
+    const radiusYUp = isMobile ? renderRadius + 1 : renderRadius;
 
     for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
       for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
