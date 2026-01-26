@@ -517,27 +517,16 @@ async function main() {
     }
   }
   
-  // Apply zoom out on mobile using CSS scale transform
-  const zoomScale = isMobile ? 0.65 : 1.0; // Scale to 65% on mobile to zoom out and show more bags
-  if (isMobile) {
-    stage.style.transform = `translateZ(0) scale(${zoomScale})`;
-    stage.style.transformOrigin = 'center center';
-  }
-  
-  // Calculate camera position - account for scale on mobile
-  // When scaled, the effective viewport shows more world space
-  const effectiveVw = vw / zoomScale;
-  
   // If we found a bag, center on it; otherwise fall back to tile center
   if (centerBag) {
     const bagCenterX = centerBag.x + centerBag.width / 2;
     const bagCenterY = centerBag.y + centerBag.height / 2;
-    // Center the bag in the effective viewport (accounts for scale)
-    camX = bagCenterX - effectiveVw / 2;
+    // Center the bag in the viewport
+    camX = bagCenterX - vw / 2;
     camY = bagCenterY - vh / 2;
   } else {
     // Fallback to tile center
-    camX = TILE_WIDTH / 2 - effectiveVw / 2;
+    camX = TILE_WIDTH / 2 - vw / 2;
     camY = TILE_HEIGHT / 2 - (isMobile ? vh / 2.5 : vh / 2);
   }
   
