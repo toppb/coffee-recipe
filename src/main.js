@@ -682,8 +682,8 @@ async function main() {
     // On mobile, also update when tile changes during drag to prevent gaps
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Larger buffer on mobile to prevent gaps
-      const buffer = isMobile ? 1000 : 800;
+      // Reduce buffer slightly to clean up more aggressively and improve performance
+      const buffer = isMobile ? 900 : 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
@@ -772,7 +772,20 @@ async function main() {
     const shouldUpdate = !isMobile || (dragging && frameCount % 3 === 0) || !dragging;
     
     if (shouldUpdate) {
-      activeClones.forEach((clone) => {
+      // During drag, only update clones that are visible or near viewport for better performance
+      // This prevents updating hundreds of off-screen clones
+      const clonesToUpdate = dragging && activeClones.length > 50
+        ? activeClones.filter((clone) => {
+            const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+            const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+            const screenX = worldX - camX;
+            const screenY = worldY - camY;
+            // Only update clones within viewport + margin
+            return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
+          })
+        : activeClones;
+      
+      clonesToUpdate.forEach((clone) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
         const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
 
