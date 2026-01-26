@@ -156,7 +156,7 @@ async function main() {
   const TILE_HEIGHT = 2400;
   // Detect mobile once at the start for use in layout calculations
   const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const GUTTER = isMobile ? 60 : 90; // Increased gutter gap to hide rendering gaps between tiles
+  const GUTTER = 90; // Same gutter gap for desktop and mobile
   const COLS = 6; // Number of columns in the tile
 
   // Camera position (world-space)
@@ -180,9 +180,9 @@ async function main() {
   let bagTapStartTime = 0;
 
   // Initialize items with doubled sizes
-  // Smaller sizes on mobile to fit more bags
-  const baseSize = isMobile ? 190 : 200; // Smaller on mobile to show more bags, original size on desktop
-  const sizeRange = isMobile ? 15 : 16; // Smaller range on mobile, original on desktop
+  // Same sizes for desktop and mobile
+  const baseSize = 200;
+  const sizeRange = 16;
   
   const baseItems = data.map((d) => {
     const number = Number(d.number);
@@ -197,8 +197,8 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Use 2 duplicates on mobile to ensure enough bags are visible
-  const duplicateCount = isMobile ? 2 : 3; // 2 duplicates on mobile, 3 on desktop
+  // Same duplicate count for desktop and mobile
+  const duplicateCount = 3;
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -218,9 +218,8 @@ async function main() {
   // Create masonry layout within a tile
   // We'll create a promise-based layout that waits for images to load
   async function createTileLayout() {
-    // Reduce padding, especially vertically, to prevent gaps between tiles
-    // Use minimal padding on mobile where gaps are more noticeable
-    const padding = isMobile ? 10 : 20; // Much smaller padding to reduce gaps
+    // Same padding for desktop and mobile
+    const padding = 20;
     const placeW = TILE_WIDTH - padding * 2;
     const placeH = TILE_HEIGHT - padding * 2;
     const colWidth = (placeW - (COLS - 1) * GUTTER) / COLS;
@@ -682,8 +681,8 @@ async function main() {
     // On mobile, also update when tile changes during drag to prevent gaps
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Reduce buffer slightly to clean up more aggressively and improve performance
-      const buffer = isMobile ? 900 : 800;
+      // Same buffer for desktop and mobile
+      const buffer = 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
