@@ -178,6 +178,9 @@ async function main() {
   let bagTapStartX = 0;
   let bagTapStartY = 0;
   let bagTapStartTime = 0;
+  // Track last camera position to skip unnecessary updates
+  let lastCamX = 0;
+  let lastCamY = 0;
 
   // Initialize items with doubled sizes
   // Same sizes for desktop and mobile
@@ -533,6 +536,10 @@ async function main() {
   
   targetCamX = camX;
   targetCamY = camY;
+  
+  // Initialize camera change tracking after camera is set
+  lastCamX = camX;
+  lastCamY = camY;
 
   // Create DOM elements for items (we'll duplicate these)
   const itemElements = new Map(); // Map from item number to element
@@ -637,6 +644,20 @@ async function main() {
   let frameCount = 0; // For frame-based throttling on mobile
   let renderPaused = false; // Pause rendering when modal is open
 
+  // Cache viewport dimensions to avoid recalculating every frame
+  let cachedVw = window.innerWidth;
+  let cachedVh = window.innerHeight;
+  
+  // Update cached viewport on resize (throttled)
+  let resizeTimeout;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      cachedVw = window.innerWidth;
+      cachedVh = window.innerHeight;
+    }, 100);
+  }, { passive: true });
+
   function render() {
     // Skip rendering when modal is open for better scroll performance
     if (renderPaused) {
@@ -645,8 +666,8 @@ async function main() {
     }
     
     frameCount++;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = cachedVw;
+    const vh = cachedVh;
 
     // Calculate which tiles are visible
     const centerX = camX + vw / 2;
@@ -712,6 +733,10 @@ async function main() {
       }
 
       // Create new clones for visible tiles
+      // Use DocumentFragment for batch DOM operations to reduce reflows
+      const fragment = document.createDocumentFragment();
+      const clonesToAdd = [];
+      
       tilesToRender.forEach(({ tx, ty }) => {
         tileItems.forEach((item) => {
           const worldX = item.x + tx * TILE_WIDTH;
@@ -731,7 +756,7 @@ async function main() {
             el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
             el.style.willChange = "transform";
             // Cursor is already set by setupBagCursor in createItemElement
-            stage.appendChild(el);
+            fragment.appendChild(el);
 
             const clone = {
               item,
@@ -739,11 +764,19 @@ async function main() {
               tileX: tx,
               tileY: ty,
             };
-            activeClones.push(clone);
-            cloneMap.set(key, clone);
+            clonesToAdd.push({ clone, key });
           }
         });
       });
+      
+      // Batch append all new clones at once to reduce reflows
+      if (fragment.hasChildNodes()) {
+        stage.appendChild(fragment);
+        clonesToAdd.forEach(({ clone, key }) => {
+          activeClones.push(clone);
+          cloneMap.set(key, clone);
+        });
+      }
     }
 
     // Smooth camera interpolation for jitter-free movement
@@ -762,12 +795,13 @@ async function main() {
       }
     }
 
-    // Always update positions (this is fast - just transform updates)
-    // Use sub-pixel precision for smoother rendering
-    // Same update behavior for desktop and mobile
-    const shouldUpdate = true;
+    // Only update positions if camera has changed
+    const cameraChanged = Math.abs(camX - lastCamX) > 0.01 || Math.abs(camY - lastCamY) > 0.01;
     
-    if (shouldUpdate) {
+    if (cameraChanged) {
+      lastCamX = camX;
+      lastCamY = camY;
+      
       // During drag, only update clones that are visible or near viewport for better performance
       // This prevents updating hundreds of off-screen clones
       const clonesToUpdate = dragging && activeClones.length > 50
