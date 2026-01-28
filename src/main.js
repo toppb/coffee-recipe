@@ -861,7 +861,8 @@ async function main() {
   }, { passive: true });
 
   // Drag handlers
-  stage.addEventListener("pointerdown", (e) => {
+  // Use touch events on mobile for faster initial response (touchstart fires immediately)
+  const handleDragStart = (e) => {
     // Don't start dragging if clicking on a bag button - let bag handle it
     if (e.target.closest('.bag')) {
       return;
@@ -872,25 +873,38 @@ async function main() {
     
     dragging = true;
     movedDuringDrag = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    lastX = e.clientX;
-    lastY = e.clientY;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragStartX = clientX;
+    dragStartY = clientY;
+    lastX = clientX;
+    lastY = clientY;
     // Sync target with current position when starting drag
     targetCamX = camX;
     targetCamY = camY;
     stage.classList.add("dragging");
-    stage.setPointerCapture(e.pointerId);
-  }, { passive: false });
+    if (e.pointerId !== undefined) {
+      stage.setPointerCapture(e.pointerId);
+    }
+  };
+  
+  // Use touchstart on mobile for faster response, pointerdown on desktop
+  if (isMobile) {
+    stage.addEventListener("touchstart", handleDragStart, { passive: false });
+  } else {
+    stage.addEventListener("pointerdown", handleDragStart, { passive: false });
+  }
 
-  stage.addEventListener("pointermove", (e) => {
+  const handleDragMove = (e) => {
     if (!dragging) return;
     
     // Prevent default to ensure smooth dragging on mobile
     e.preventDefault();
 
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - lastX;
+    const dy = clientY - lastY;
 
     // Only mark as moved if movement is significant (more than 3px for faster response)
     // Reduced threshold for faster drag detection
@@ -905,13 +919,13 @@ async function main() {
     targetCamX = camX;
     targetCamY = camY;
 
-    lastX = e.clientX;
-    lastY = e.clientY;
+    lastX = clientX;
+    lastY = clientY;
     
     // Immediately update positions for visible clones to reduce perceived delay
     // Update synchronously for immediate visual feedback, especially important on mobile
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = cachedVw;
+    const vh = cachedVh;
     activeClones.forEach((clone) => {
       const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
       const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
@@ -922,16 +936,33 @@ async function main() {
         clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
       }
     });
-  }, { passive: false });
+  };
+  
+  // Use touchmove on mobile for faster response, pointermove on desktop
+  if (isMobile) {
+    stage.addEventListener("touchmove", handleDragMove, { passive: false });
+  } else {
+    stage.addEventListener("pointermove", handleDragMove, { passive: false });
+  }
 
-  stage.addEventListener("pointerup", (e) => {
+  const handleDragEnd = (e) => {
     dragging = false;
     stage.classList.remove("dragging");
-    stage.releasePointerCapture(e.pointerId);
+    if (e.pointerId !== undefined) {
+      stage.releasePointerCapture(e.pointerId);
+    }
     updateStageCursor(); // Update cursor state after drag ends
     lastDragEndTime = Date.now(); // Track when drag ended
     setTimeout(() => (movedDuringDrag = false), 100);
-  }, { passive: true });
+  };
+  
+  // Use touchend on mobile, pointerup on desktop
+  if (isMobile) {
+    stage.addEventListener("touchend", handleDragEnd, { passive: true });
+    stage.addEventListener("touchcancel", handleDragEnd, { passive: true });
+  } else {
+    stage.addEventListener("pointerup", handleDragEnd, { passive: true });
+  }
 
   // Scroll wheel navigation
   stage.addEventListener("wheel", (e) => {
