@@ -795,37 +795,34 @@ async function main() {
       }
     }
 
-    // Only update positions if camera has changed
-    const cameraChanged = Math.abs(camX - lastCamX) > 0.01 || Math.abs(camY - lastCamY) > 0.01;
+    // Always update positions (camera change detection removed - was causing lag on mobile)
+    // During drag, only update clones that are visible or near viewport for better performance
+    // This prevents updating hundreds of off-screen clones
+    const clonesToUpdate = dragging && activeClones.length > 50
+      ? activeClones.filter((clone) => {
+          const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+          const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+          const screenX = worldX - camX;
+          const screenY = worldY - camY;
+          // Only update clones within viewport + margin
+          return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
+        })
+      : activeClones;
     
-    if (cameraChanged) {
-      lastCamX = camX;
-      lastCamY = camY;
-      
-      // During drag, only update clones that are visible or near viewport for better performance
-      // This prevents updating hundreds of off-screen clones
-      const clonesToUpdate = dragging && activeClones.length > 50
-        ? activeClones.filter((clone) => {
-            const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-            const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
-            const screenX = worldX - camX;
-            const screenY = worldY - camY;
-            // Only update clones within viewport + margin
-            return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
-          })
-        : activeClones;
-      
-      clonesToUpdate.forEach((clone) => {
-        const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-        const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+    clonesToUpdate.forEach((clone) => {
+      const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+      const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
 
-        const screenX = worldX - camX;
-        const screenY = worldY - camY;
+      const screenX = worldX - camX;
+      const screenY = worldY - camY;
 
-        // Browser handles sub-pixel rendering automatically
-        clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-      });
-    }
+      // Browser handles sub-pixel rendering automatically
+      clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+    });
+    
+    // Update last camera position for tracking
+    lastCamX = camX;
+    lastCamY = camY;
 
     requestAnimationFrame(render);
   }
