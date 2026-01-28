@@ -861,9 +861,9 @@ async function main() {
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
 
-    // Only mark as moved if movement is significant (more than 5px)
-    // This prevents accidental drag detection on small touches/clicks
-    if (Math.abs(dx) + Math.abs(dy) > 5) {
+    // Only mark as moved if movement is significant (more than 3px for faster response)
+    // Reduced threshold for faster drag detection
+    if (Math.abs(dx) + Math.abs(dy) > 3) {
       movedDuringDrag = true;
     }
 
@@ -876,6 +876,21 @@ async function main() {
 
     lastX = e.clientX;
     lastY = e.clientY;
+    
+    // Immediately update positions for visible clones to reduce perceived delay
+    // Update synchronously for immediate visual feedback, especially important on mobile
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    activeClones.forEach((clone) => {
+      const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+      const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+      const screenX = worldX - camX;
+      const screenY = worldY - camY;
+      // Only update visible clones to avoid performance hit
+      if (screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2) {
+        clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+      }
+    });
   }, { passive: false });
 
   stage.addEventListener("pointerup", (e) => {
