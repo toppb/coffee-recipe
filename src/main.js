@@ -836,6 +836,9 @@ async function main() {
       return;
     }
     
+    // Prevent default immediately for faster touch response
+    e.preventDefault();
+    
     dragging = true;
     movedDuringDrag = false;
     dragStartX = e.clientX;
@@ -847,11 +850,13 @@ async function main() {
     targetCamY = camY;
     stage.classList.add("dragging");
     stage.setPointerCapture(e.pointerId);
-    e.preventDefault(); // Prevent default touch behavior on mobile
   }, { passive: false });
 
   stage.addEventListener("pointermove", (e) => {
     if (!dragging) return;
+    
+    // Prevent default to ensure smooth dragging on mobile
+    e.preventDefault();
 
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -871,7 +876,7 @@ async function main() {
 
     lastX = e.clientX;
     lastY = e.clientY;
-  }, { passive: true });
+  }, { passive: false });
 
   stage.addEventListener("pointerup", (e) => {
     dragging = false;
