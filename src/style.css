@@ -56,6 +56,7 @@ button.bag{
   transform: translateZ(0); /* Force GPU acceleration */
   -webkit-transform: translateZ(0); /* Safari GPU acceleration */
   z-index: 1;
+  contain: layout style paint; /* Optimize rendering - isolate bag rendering */
 }
 @media (max-width: 760px){
   .bag,
@@ -96,6 +97,9 @@ button.bag:focus{
   filter: drop-shadow(0 6px 12px rgba(0,0,0,.14));
   transition: transform .15s ease, filter .15s ease;
   pointer-events:none;
+  /* Performance optimizations */
+  image-rendering: -webkit-optimize-contrast; /* Better image rendering */
+  content-visibility: auto; /* Browser can skip rendering when off-screen */
 }
 
 .bag:hover img{

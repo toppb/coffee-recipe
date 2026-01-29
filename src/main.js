@@ -132,7 +132,10 @@ function imgFor(number) {
 }
 
 async function main() {
-  const res = await fetch("/data/coffee.json");
+  // Fetch with cache optimization
+  const res = await fetch("/data/coffee.json", {
+    cache: "default" // Allow browser caching
+  });
   const data = await res.json();
 
   const app = document.querySelector("#app");
@@ -231,9 +234,14 @@ async function main() {
     const positionedItems = [];
 
     // Preload images and get their dimensions
-    const imagePromises = duplicatedItems.map((it) => {
+    // Prioritize first few items for faster initial render
+    const imagePromises = duplicatedItems.map((it, index) => {
       return new Promise((resolve) => {
         const img = new Image();
+        // Set fetch priority for first few images
+        if (index < 10) {
+          img.fetchPriority = "high";
+        }
         img.onload = () => {
           resolve({
             ...it,
@@ -604,6 +612,10 @@ async function main() {
     img.alt = item.name ? `${item.name} bag` : `Coffee bag ${item.number}`;
     img.style.width = `${item.width}px`;
     img.style.height = `${item.height}px`;
+    // Performance optimizations
+    img.loading = "lazy"; // Lazy load images that aren't immediately visible
+    img.decoding = "async"; // Decode images asynchronously
+    img.fetchPriority = item.number <= 3 ? "high" : "low"; // Prioritize first few images
     img.style.objectFit = "contain";
 
     el.appendChild(img);
@@ -1179,7 +1191,9 @@ async function main() {
       // Try to load markdown file - adjust path based on where you place your .md files
       // Options: /recipes/coffee-01.md, /src/data/recipes/coffee-01.md, etc.
       const recipePath = `/recipes/coffee-${pad2(it.number)}.md`;
-      const response = await fetch(recipePath);
+      const response = await fetch(recipePath, {
+        cache: "default" // Allow browser caching for recipes
+      });
       
       if (response.ok) {
         const markdown = await response.text();
