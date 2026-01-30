@@ -20,9 +20,11 @@ body{
   cursor: grab;
   user-select:none;
   touch-action:none;
-  contain: layout style paint; /* Optimize rendering performance */
+  /* Enhancement #8: GPU acceleration for stage */
   transform: translateZ(0); /* Force GPU acceleration */
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  -webkit-transform: translateZ(0); /* Safari GPU acceleration */
+  /* Enhancement #10: CSS containment for stage */
+  contain: layout style paint; /* Optimize rendering performance */
 }
 @media (max-width: 760px){
   #stage{
@@ -51,11 +53,12 @@ button.bag{
   padding:4px;
   cursor:pointer !important;
   pointer-events: auto !important;
-  will-change: transform;
-  backface-visibility: hidden; /* Prevent jitter during transforms */
+  /* Enhancement #9: GPU acceleration for bags */
   transform: translateZ(0); /* Force GPU acceleration */
   -webkit-transform: translateZ(0); /* Safari GPU acceleration */
-  z-index: 1;
+  backface-visibility: hidden; /* Prevent jitter during transforms */
+  will-change: transform;
+  /* Enhancement #11: CSS containment for bags (shadows removed to prevent edge color issues) */
   contain: layout style paint; /* Optimize rendering - isolate bag rendering */
 }
 @media (max-width: 760px){
@@ -94,17 +97,14 @@ button.bag:focus{
   display:block;
   height:auto;
   width:auto;
-  filter: drop-shadow(0 6px 12px rgba(0,0,0,.14));
-  transition: transform .15s ease, filter .15s ease;
+  transition: transform .15s ease;
   pointer-events:none;
-  /* Performance optimizations */
-  image-rendering: -webkit-optimize-contrast; /* Better image rendering */
+  /* Enhancement #7: Content visibility optimization */
   content-visibility: auto; /* Browser can skip rendering when off-screen */
 }
 
 .bag:hover img{
   transform: translateY(-2px) scale(1.03);
-  filter: drop-shadow(0 10px 18px rgba(0,0,0,.18));
 }
 
 /* Modal */

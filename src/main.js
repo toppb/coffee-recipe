@@ -132,7 +132,7 @@ function imgFor(number) {
 }
 
 async function main() {
-  // Fetch with cache optimization
+  // Enhancement #1: Cache hints for fetch
   const res = await fetch("/data/coffee.json", {
     cache: "default" // Allow browser caching
   });
@@ -234,7 +234,7 @@ async function main() {
     const positionedItems = [];
 
     // Preload images and get their dimensions
-    // Prioritize first few items for faster initial render
+    // Enhancement #2: Prioritize first few images for faster initial render
     const imagePromises = duplicatedItems.map((it, index) => {
       return new Promise((resolve) => {
         const img = new Image();
@@ -612,7 +612,7 @@ async function main() {
     img.alt = item.name ? `${item.name} bag` : `Coffee bag ${item.number}`;
     img.style.width = `${item.width}px`;
     img.style.height = `${item.height}px`;
-    // Performance optimizations
+    // Enhancement #2: Image loading optimizations
     img.loading = "lazy"; // Lazy load images that aren't immediately visible
     img.decoding = "async"; // Decode images asynchronously
     img.fetchPriority = item.number <= 3 ? "high" : "low"; // Prioritize first few images
@@ -653,10 +653,10 @@ async function main() {
   // Render function - creates/updates visible clones
   let lastTileX = Infinity;
   let lastTileY = Infinity;
-  let frameCount = 0; // For frame-based throttling on mobile
-  let renderPaused = false; // Pause rendering when modal is open
+  // Enhancement #4: Pause rendering when modal is open
+  let renderPaused = false;
 
-  // Cache viewport dimensions to avoid recalculating every frame
+  // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
   let cachedVw = window.innerWidth;
   let cachedVh = window.innerHeight;
   
@@ -671,13 +671,12 @@ async function main() {
   }, { passive: true });
 
   function render() {
-    // Skip rendering when modal is open for better scroll performance
+    // Enhancement #4: Skip rendering when modal is open for better scroll performance
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
     }
     
-    frameCount++;
     const vw = cachedVw;
     const vh = cachedVh;
 
@@ -745,7 +744,7 @@ async function main() {
       }
 
       // Create new clones for visible tiles
-      // Use DocumentFragment for batch DOM operations to reduce reflows
+      // Enhancement #5: Use DocumentFragment for batch DOM operations to reduce reflows
       const fragment = document.createDocumentFragment();
       const clonesToAdd = [];
       
@@ -781,7 +780,7 @@ async function main() {
         });
       });
       
-      // Batch append all new clones at once to reduce reflows
+      // Enhancement #5: Batch append all new clones at once to reduce reflows
       if (fragment.hasChildNodes()) {
         stage.appendChild(fragment);
         clonesToAdd.forEach(({ clone, key }) => {
@@ -807,8 +806,7 @@ async function main() {
       }
     }
 
-    // Always update positions (camera change detection removed - was causing lag on mobile)
-    // During drag, only update clones that are visible or near viewport for better performance
+    // Enhancement #6: During drag, only update clones that are visible or near viewport for better performance
     // This prevents updating hundreds of off-screen clones
     const clonesToUpdate = dragging && activeClones.length > 50
       ? activeClones.filter((clone) => {
@@ -1179,7 +1177,7 @@ async function main() {
     overlay.style.visibility = "visible";
     overlay.style.opacity = "1";
     overlay.style.zIndex = "2000";
-    renderPaused = true; // Pause grid rendering when modal is open
+    renderPaused = true; // Enhancement #4: Pause grid rendering when modal is open
     
     // Scroll modal body to top
     const modalBody = overlay.querySelector(".modalBody");
@@ -1255,7 +1253,7 @@ async function main() {
     overlay.classList.remove("open");
     overlay.style.display = "none";
     overlay.style.visibility = "hidden";
-    renderPaused = false; // Resume grid rendering when modal closes
+    renderPaused = false; // Enhancement #4: Resume grid rendering when modal closes
   }
 
   mClose.addEventListener("click", closeModal);
