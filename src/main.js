@@ -649,6 +649,10 @@ async function main() {
   // Active clones (visible items) - use Map for faster lookups
   const activeClones = [];
   const cloneMap = new Map(); // Key: `${item.number}_${item._duplicateId}_${tx}_${ty}`
+  
+  // Container-based transforms: Map of tile containers
+  // Key: `${tx}_${ty}`, Value: { container: HTMLElement, tileX: number, tileY: number }
+  const tileContainers = new Map();
 
   // Render function - creates/updates visible clones
   let lastTileX = Infinity;
@@ -711,14 +715,16 @@ async function main() {
     // Create/remove clones when tile changes or when not dragging
     // On mobile, also update when tile changes during drag to prevent gaps
     if (!isDragging || tileChanged) {
-      // Remove clones that are too far away (larger buffer for smooth transitions)
+      // Remove tiles and clones that are too far away (larger buffer for smooth transitions)
       // Same buffer for desktop and mobile
       const buffer = 800;
+      const tilesToRemove = [];
       const clonesToRemove = [];
-      activeClones.forEach((clone, index) => {
-        const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-        const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
-
+      
+      // Check which tiles are out of view
+      tileContainers.forEach((tileContainer, tileKey) => {
+        const worldX = tileContainer.tileX * TILE_WIDTH;
+        const worldY = tileContainer.tileY * TILE_HEIGHT;
         const screenX = worldX - camX;
         const screenY = worldY - camY;
 
@@ -728,10 +734,16 @@ async function main() {
           screenX > vw + buffer ||
           screenY > vh + buffer
         ) {
-          if (clone.el.parentNode) {
-            clone.el.remove();
-          }
-          // Create key for map removal
+          tilesToRemove.push(tileKey);
+        }
+      });
+      
+      // Remove clones from tiles that are being removed
+      // Note: When container is removed, all its children (bags) are automatically removed
+      activeClones.forEach((clone, index) => {
+        const tileKey = `${clone.tileX}_${clone.tileY}`;
+        if (tilesToRemove.includes(tileKey)) {
+          // Don't manually remove el - it will be removed with container
           const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
           cloneMap.delete(key);
           clonesToRemove.push(index);
@@ -742,6 +754,15 @@ async function main() {
       for (let i = clonesToRemove.length - 1; i >= 0; i--) {
         activeClones.splice(clonesToRemove[i], 1);
       }
+      
+      // Remove tile containers
+      tilesToRemove.forEach(tileKey => {
+        const tileContainer = tileContainers.get(tileKey);
+        if (tileContainer && tileContainer.container.parentNode) {
+          tileContainer.container.remove();
+        }
+        tileContainers.delete(tileKey);
+      });
 
       // Create new clones for visible tiles
       // Enhancement #5: Use DocumentFragment for batch DOM operations to reduce reflows
@@ -749,25 +770,53 @@ async function main() {
       const clonesToAdd = [];
       
       tilesToRender.forEach(({ tx, ty }) => {
-        tileItems.forEach((item) => {
-          const worldX = item.x + tx * TILE_WIDTH;
-          const worldY = item.y + ty * TILE_HEIGHT;
-
+        // Get or create tile container
+        const tileKey = `${tx}_${ty}`;
+        let tileContainer = tileContainers.get(tileKey);
+        
+        if (!tileContainer) {
+          // Create new tile container
+          const container = document.createElement("div");
+          container.className = "tile-container";
+          container.style.position = "absolute";
+          container.style.left = "0";
+          container.style.top = "0";
+          container.style.width = `${TILE_WIDTH}px`;
+          container.style.height = `${TILE_HEIGHT}px`;
+          container.style.transformOrigin = "0 0";
+          
+          // Set initial transform position
+          const worldX = tx * TILE_WIDTH;
+          const worldY = ty * TILE_HEIGHT;
           const screenX = worldX - camX;
           const screenY = worldY - camY;
-
+          container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+          
+          fragment.appendChild(container);
+          
+          tileContainer = {
+            container,
+            tileX: tx,
+            tileY: ty,
+          };
+          tileContainers.set(tileKey, tileContainer);
+        }
+        
+        tileItems.forEach((item) => {
           // Use Map for O(1) lookup instead of O(n) find
           const key = `${item.number}_${item._duplicateId || 0}_${tx}_${ty}`;
           const existing = cloneMap.get(key);
 
           if (!existing) {
-            // Create new clone
+            // Create new clone - positioned relative to tile container
             const el = createItemElement(item);
             el.style.position = "absolute";
-            el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+            el.style.left = `${item.x}px`;
+            el.style.top = `${item.y}px`;
+            el.style.transform = "translateZ(0)"; // Keep GPU acceleration, no position transform
             el.style.willChange = "transform";
             // Cursor is already set by setupBagCursor in createItemElement
-            fragment.appendChild(el);
+            tileContainer.container.appendChild(el);
 
             const clone = {
               item,
@@ -780,7 +829,7 @@ async function main() {
         });
       });
       
-      // Enhancement #5: Batch append all new clones at once to reduce reflows
+      // Enhancement #5: Batch append all new tile containers at once to reduce reflows
       if (fragment.hasChildNodes()) {
         stage.appendChild(fragment);
         clonesToAdd.forEach(({ clone, key }) => {
@@ -806,28 +855,17 @@ async function main() {
       }
     }
 
-    // Enhancement #6: During drag, only update clones that are visible or near viewport for better performance
-    // This prevents updating hundreds of off-screen clones
-    const clonesToUpdate = dragging && activeClones.length > 50
-      ? activeClones.filter((clone) => {
-          const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-          const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
-          const screenX = worldX - camX;
-          const screenY = worldY - camY;
-          // Only update clones within viewport + margin
-          return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
-        })
-      : activeClones;
-    
-    clonesToUpdate.forEach((clone) => {
-      const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-      const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
-
+    // Container-based transforms: Update tile container positions instead of individual bags
+    // This dramatically reduces the number of DOM updates (from 100+ to ~10-20)
+    // Update all containers - they're cheap to update and ensures correct positioning
+    tileContainers.forEach((tileContainer) => {
+      const worldX = tileContainer.tileX * TILE_WIDTH;
+      const worldY = tileContainer.tileY * TILE_HEIGHT;
       const screenX = worldX - camX;
       const screenY = worldY - camY;
 
-      // Browser handles sub-pixel rendering automatically
-      clone.el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+      // Transform the container instead of individual bags
+      tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
     });
     
     // Update last camera position for tracking

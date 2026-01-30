@@ -43,6 +43,17 @@ body{
   cursor: pointer !important;
 }
 
+/* Tile containers for container-based transforms */
+.tile-container{
+  position: absolute;
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Enhancement #11: CSS containment on containers instead of individual bags */
+  contain: layout style paint; /* Optimize rendering - isolate tile rendering */
+  backface-visibility: hidden;
+}
+
 .bag,
 #stage .bag,
 #stage button.bag,
@@ -58,8 +69,7 @@ button.bag{
   -webkit-transform: translateZ(0); /* Safari GPU acceleration */
   backface-visibility: hidden; /* Prevent jitter during transforms */
   will-change: transform;
-  /* Enhancement #11: CSS containment for bags (shadows removed to prevent edge color issues) */
-  contain: layout style paint; /* Optimize rendering - isolate bag rendering */
+  /* Containment removed - now on tile containers for better performance */
 }
 @media (max-width: 760px){
   .bag,
