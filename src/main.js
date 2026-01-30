@@ -655,6 +655,9 @@ async function main() {
   let lastTileY = Infinity;
   // Enhancement #4: Pause rendering when modal is open
   let renderPaused = false;
+  // Mobile: Throttle render updates during drag
+  let lastRenderTime = 0;
+  let pendingRender = false;
 
   // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
   let cachedVw = window.innerWidth;
@@ -675,6 +678,22 @@ async function main() {
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
+    }
+    
+    // Mobile: Throttle render during drag to ~30fps for better performance
+    if (isMobile && dragging) {
+      const now = performance.now();
+      if (now - lastRenderTime < 33) { // ~30fps (33ms)
+        if (!pendingRender) {
+          pendingRender = true;
+          requestAnimationFrame(() => {
+            pendingRender = false;
+            render();
+          });
+        }
+        return;
+      }
+      lastRenderTime = now;
     }
     
     const vw = cachedVw;
@@ -808,14 +827,17 @@ async function main() {
 
     // Enhancement #6: During drag, only update clones that are visible or near viewport for better performance
     // This prevents updating hundreds of off-screen clones
-    const clonesToUpdate = dragging && activeClones.length > 50
+    // More aggressive filtering on mobile
+    const updateThreshold = isMobile ? 30 : 50;
+    const viewportMargin = isMobile ? vw * 1.5 : vw * 2;
+    const clonesToUpdate = dragging && activeClones.length > updateThreshold
       ? activeClones.filter((clone) => {
           const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
           const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
           const screenX = worldX - camX;
           const screenY = worldY - camY;
-          // Only update clones within viewport + margin
-          return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
+          // Only update clones within viewport + margin (smaller margin on mobile)
+          return screenX > -viewportMargin && screenX < viewportMargin && screenY > -vh && screenY < vh * 2;
         })
       : activeClones;
     
@@ -870,8 +892,16 @@ async function main() {
     }
   }, { passive: true });
 
-  // Drag handlers
-  stage.addEventListener("pointerdown", (e) => {
+  // Helper function to get touch/pointer coordinates
+  function getEventCoords(e) {
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  // Drag handlers - use touch events on mobile for better performance
+  function handleDragStart(e) {
     // Don't start dragging if clicking on a bag button - let bag handle it
     if (e.target.closest('.bag')) {
       return;
@@ -880,27 +910,33 @@ async function main() {
     // Prevent default immediately for faster touch response
     e.preventDefault();
     
+    const coords = getEventCoords(e);
     dragging = true;
     movedDuringDrag = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    lastX = e.clientX;
-    lastY = e.clientY;
+    dragStartX = coords.x;
+    dragStartY = coords.y;
+    lastX = coords.x;
+    lastY = coords.y;
     // Sync target with current position when starting drag
     targetCamX = camX;
     targetCamY = camY;
     stage.classList.add("dragging");
-    stage.setPointerCapture(e.pointerId);
-  }, { passive: false });
+    
+    // Use pointer capture for desktop, touch events handle this automatically on mobile
+    if (e.pointerId !== undefined) {
+      stage.setPointerCapture(e.pointerId);
+    }
+  }
 
-  stage.addEventListener("pointermove", (e) => {
+  function handleDragMove(e) {
     if (!dragging) return;
     
     // Prevent default to ensure smooth dragging on mobile
     e.preventDefault();
 
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
+    const coords = getEventCoords(e);
+    const dx = coords.x - lastX;
+    const dy = coords.y - lastY;
 
     // Only mark as moved if movement is significant (more than 3px for faster response)
     // Reduced threshold for faster drag detection
@@ -915,21 +951,44 @@ async function main() {
     targetCamX = camX;
     targetCamY = camY;
 
-    lastX = e.clientX;
-    lastY = e.clientY;
+    lastX = coords.x;
+    lastY = coords.y;
     
-    // Don't update positions here - let the render loop handle it to avoid overheating
-    // The render loop will update positions on the next frame
-  }, { passive: false });
+    // Mobile: Request render immediately for smoother dragging
+    if (isMobile && !pendingRender) {
+      pendingRender = true;
+      requestAnimationFrame(() => {
+        pendingRender = false;
+        render();
+      });
+    }
+  }
 
-  stage.addEventListener("pointerup", (e) => {
+  function handleDragEnd(e) {
     dragging = false;
     stage.classList.remove("dragging");
-    stage.releasePointerCapture(e.pointerId);
+    
+    // Release pointer capture for desktop
+    if (e.pointerId !== undefined) {
+      stage.releasePointerCapture(e.pointerId);
+    }
+    
     updateStageCursor(); // Update cursor state after drag ends
     lastDragEndTime = Date.now(); // Track when drag ended
     setTimeout(() => (movedDuringDrag = false), 100);
-  }, { passive: true });
+  }
+
+  // Use touch events on mobile, pointer events on desktop
+  if (isMobile) {
+    stage.addEventListener("touchstart", handleDragStart, { passive: false });
+    stage.addEventListener("touchmove", handleDragMove, { passive: false });
+    stage.addEventListener("touchend", handleDragEnd, { passive: true });
+    stage.addEventListener("touchcancel", handleDragEnd, { passive: true });
+  } else {
+    stage.addEventListener("pointerdown", handleDragStart, { passive: false });
+    stage.addEventListener("pointermove", handleDragMove, { passive: false });
+    stage.addEventListener("pointerup", handleDragEnd, { passive: true });
+  }
 
   // Scroll wheel navigation
   stage.addEventListener("wheel", (e) => {

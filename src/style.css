@@ -32,6 +32,9 @@ body{
     will-change: transform;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
+    /* Better touch handling on mobile */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 }
 
