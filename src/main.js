@@ -659,9 +659,6 @@ async function main() {
   let lastTileY = Infinity;
   // Enhancement #4: Pause rendering when modal is open
   let renderPaused = false;
-  // Mobile: Throttle render during drag
-  let lastMobileRenderTime = 0;
-  const MOBILE_RENDER_INTERVAL = 33; // ~30fps on mobile during drag
 
   // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
   let cachedVw = window.innerWidth;
@@ -682,16 +679,6 @@ async function main() {
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
-    }
-    
-    // Mobile: Throttle render during drag to reduce work
-    if (isMobile && dragging) {
-      const now = performance.now();
-      if (now - lastMobileRenderTime < MOBILE_RENDER_INTERVAL) {
-        requestAnimationFrame(render);
-        return;
-      }
-      lastMobileRenderTime = now;
     }
     
     // Mobile: Skip expensive clone creation/removal during drag for better performance
@@ -881,14 +868,6 @@ async function main() {
 
       // Transform the container instead of individual bags
       tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-      
-      // Mobile during drag: Hide containers that are far off-screen to reduce rendering cost
-      if (isMobile && dragging) {
-        const isVisible = screenX > -vw * 2 && screenX < vw * 3 && screenY > -vh * 2 && screenY < vh * 3;
-        tileContainer.container.style.display = isVisible ? 'block' : 'none';
-      } else {
-        tileContainer.container.style.display = 'block';
-      }
     });
     
     // Update last camera position for tracking
@@ -952,11 +931,6 @@ async function main() {
     targetCamY = camY;
     stage.classList.add("dragging");
     stage.setPointerCapture(e.pointerId);
-    
-    // Mobile: Force a render immediately to ensure containers are positioned correctly
-    if (isMobile) {
-      render();
-    }
   }, { passive: false });
 
   stage.addEventListener("pointermove", (e) => {
