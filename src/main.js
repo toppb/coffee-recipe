@@ -891,6 +891,13 @@ async function main() {
     targetCamY = camY;
     stage.classList.add("dragging");
     stage.setPointerCapture(e.pointerId);
+    
+    // Mobile optimization: Force immediate render on drag start for responsive feel
+    if (isMobile) {
+      requestAnimationFrame(() => {
+        render();
+      });
+    }
   }, { passive: false });
 
   stage.addEventListener("pointermove", (e) => {
@@ -902,9 +909,9 @@ async function main() {
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
 
-    // Only mark as moved if movement is significant (more than 3px for faster response)
-    // Reduced threshold for faster drag detection
-    if (Math.abs(dx) + Math.abs(dy) > 3) {
+    // Mobile: Lower threshold for faster drag detection (1px vs 3px)
+    const moveThreshold = isMobile ? 1 : 3;
+    if (Math.abs(dx) + Math.abs(dy) > moveThreshold) {
       movedDuringDrag = true;
     }
 
@@ -918,8 +925,12 @@ async function main() {
     lastX = e.clientX;
     lastY = e.clientY;
     
-    // Don't update positions here - let the render loop handle it to avoid overheating
-    // The render loop will update positions on the next frame
+    // Mobile optimization: Request immediate render for smoother dragging
+    if (isMobile && (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5)) {
+      requestAnimationFrame(() => {
+        if (dragging) render();
+      });
+    }
   }, { passive: false });
 
   stage.addEventListener("pointerup", (e) => {

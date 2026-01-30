@@ -66,11 +66,7 @@ button.bag{
   #stage .bag,
   #stage button.bag,
   button.bag{
-    /* Reduce will-change on mobile to avoid performance issues */
-    will-change: auto;
-  }
-  #stage.dragging .bag{
-    /* Only use will-change during drag on mobile */
+    /* Keep will-change on mobile for better initial drag responsiveness */
     will-change: transform;
   }
 }
