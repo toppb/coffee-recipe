@@ -203,8 +203,8 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Same duplicate count for desktop and mobile
-  const duplicateCount = 3;
+  // Reduce duplicates on mobile for better performance (fewer DOM elements)
+  const duplicateCount = isMobile ? 2 : 3;
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -681,6 +681,9 @@ async function main() {
       return;
     }
     
+    // Mobile: Skip expensive clone creation/removal during drag for better performance
+    const skipCloneManagement = isMobile && dragging;
+    
     const vw = cachedVw;
     const vh = cachedVh;
 
@@ -698,8 +701,8 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Same render radius for desktop and mobile
-    const renderRadius = 3;
+    // Reduce render radius on mobile for better performance (fewer tiles = fewer elements)
+    const renderRadius = isMobile ? 2 : 3;
     const tilesToRender = [];
     
     // Same render radius extension for desktop and mobile
@@ -713,8 +716,8 @@ async function main() {
     }
 
     // Create/remove clones when tile changes or when not dragging
-    // On mobile, also update when tile changes during drag to prevent gaps
-    if (!isDragging || tileChanged) {
+    // Skip on mobile during drag for better performance
+    if ((!isDragging || tileChanged) && !skipCloneManagement) {
       // Remove tiles and clones that are too far away (larger buffer for smooth transitions)
       // Same buffer for desktop and mobile
       const buffer = 800;
@@ -857,8 +860,19 @@ async function main() {
 
     // Container-based transforms: Update tile container positions instead of individual bags
     // This dramatically reduces the number of DOM updates (from 100+ to ~10-20)
-    // Update all containers - they're cheap to update and ensures correct positioning
-    tileContainers.forEach((tileContainer) => {
+    // On mobile during drag, only update visible containers for better performance
+    const containersToUpdate = isMobile && dragging && tileContainers.size > 15
+      ? Array.from(tileContainers.values()).filter((tileContainer) => {
+          const worldX = tileContainer.tileX * TILE_WIDTH;
+          const worldY = tileContainer.tileY * TILE_HEIGHT;
+          const screenX = worldX - camX;
+          const screenY = worldY - camY;
+          // Only update containers within viewport + small margin on mobile during drag
+          return screenX > -vw * 1.5 && screenX < vw * 2.5 && screenY > -vh * 1.5 && screenY < vh * 2.5;
+        })
+      : Array.from(tileContainers.values());
+    
+    containersToUpdate.forEach((tileContainer) => {
       const worldX = tileContainer.tileX * TILE_WIDTH;
       const worldY = tileContainer.tileY * TILE_HEIGHT;
       const screenX = worldX - camX;

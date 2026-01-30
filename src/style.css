@@ -53,6 +53,16 @@ body{
   contain: layout style paint; /* Optimize rendering - isolate tile rendering */
   backface-visibility: hidden;
 }
+@media (max-width: 760px){
+  .tile-container{
+    /* Remove containment on mobile - it can cause performance issues */
+    contain: none;
+  }
+  #stage.dragging .tile-container{
+    /* Only use will-change during drag on mobile */
+    will-change: transform;
+  }
+}
 
 .bag,
 #stage .bag,
