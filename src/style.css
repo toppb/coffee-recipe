@@ -66,6 +66,8 @@ button.bag{
   #stage .bag,
   #stage button.bag,
   button.bag{
+    /* Disable containment on mobile for better performance */
+    contain: none;
     /* Reduce will-change on mobile to avoid performance issues */
     will-change: auto;
   }

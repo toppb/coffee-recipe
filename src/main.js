@@ -203,8 +203,8 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Same duplicate count for desktop and mobile
-  const duplicateCount = 3;
+  // Reduce duplicate count on mobile for better performance
+  const duplicateCount = isMobile ? 2 : 3;
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -655,6 +655,9 @@ async function main() {
   let lastTileY = Infinity;
   // Enhancement #4: Pause rendering when modal is open
   let renderPaused = false;
+  // Mobile: Frame throttling for better performance
+  let lastRenderTime = 0;
+  const mobileFrameInterval = 16; // ~60fps max on mobile (16ms between frames)
 
   // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
   let cachedVw = window.innerWidth;
@@ -677,6 +680,16 @@ async function main() {
       return;
     }
     
+    // Mobile: Throttle frames during drag for better performance
+    if (isMobile && dragging) {
+      const now = performance.now();
+      if (now - lastRenderTime < mobileFrameInterval) {
+        requestAnimationFrame(render);
+        return;
+      }
+      lastRenderTime = now;
+    }
+    
     const vw = cachedVw;
     const vh = cachedVh;
 
@@ -694,8 +707,8 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Same render radius for desktop and mobile
-    const renderRadius = 3;
+    // Reduce render radius on mobile for better performance
+    const renderRadius = isMobile ? 2 : 3;
     const tilesToRender = [];
     
     // Same render radius extension for desktop and mobile
@@ -712,8 +725,8 @@ async function main() {
     // On mobile, also update when tile changes during drag to prevent gaps
     if (!isDragging || tileChanged) {
       // Remove clones that are too far away (larger buffer for smooth transitions)
-      // Same buffer for desktop and mobile
-      const buffer = 800;
+      // Smaller buffer on mobile for better performance
+      const buffer = isMobile ? 400 : 800;
       const clonesToRemove = [];
       activeClones.forEach((clone, index) => {
         const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
@@ -808,14 +821,17 @@ async function main() {
 
     // Enhancement #6: During drag, only update clones that are visible or near viewport for better performance
     // This prevents updating hundreds of off-screen clones
-    const clonesToUpdate = dragging && activeClones.length > 50
+    // Lower threshold on mobile for better performance
+    const updateThreshold = isMobile ? 20 : 50;
+    const clonesToUpdate = dragging && activeClones.length > updateThreshold
       ? activeClones.filter((clone) => {
           const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
           const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
           const screenX = worldX - camX;
           const screenY = worldY - camY;
-          // Only update clones within viewport + margin
-          return screenX > -vw && screenX < vw * 2 && screenY > -vh && screenY < vh * 2;
+          // Only update clones within viewport + margin (smaller margin on mobile)
+          const margin = isMobile ? vw : vw * 2;
+          return screenX > -margin && screenX < margin && screenY > -vh && screenY < vh * 2;
         })
       : activeClones;
     
