@@ -62,6 +62,11 @@ body{
     /* Only use will-change during drag on mobile */
     will-change: transform;
   }
+  /* During drag, reduce rendering complexity on mobile */
+  #stage.dragging .bag img{
+    /* Disable transitions during drag for better performance */
+    transition: none;
+  }
 }
 
 .bag,

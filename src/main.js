@@ -659,6 +659,9 @@ async function main() {
   let lastTileY = Infinity;
   // Enhancement #4: Pause rendering when modal is open
   let renderPaused = false;
+  // Mobile: Throttle render during drag
+  let lastMobileRenderTime = 0;
+  const MOBILE_RENDER_INTERVAL = 33; // ~30fps on mobile during drag
 
   // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
   let cachedVw = window.innerWidth;
@@ -679,6 +682,16 @@ async function main() {
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
+    }
+    
+    // Mobile: Throttle render during drag to reduce work
+    if (isMobile && dragging) {
+      const now = performance.now();
+      if (now - lastMobileRenderTime < MOBILE_RENDER_INTERVAL) {
+        requestAnimationFrame(render);
+        return;
+      }
+      lastMobileRenderTime = now;
     }
     
     // Mobile: Skip expensive clone creation/removal during drag for better performance
@@ -860,19 +873,7 @@ async function main() {
 
     // Container-based transforms: Update tile container positions instead of individual bags
     // This dramatically reduces the number of DOM updates (from 100+ to ~10-20)
-    // On mobile during drag, only update visible containers for better performance
-    const containersToUpdate = isMobile && dragging && tileContainers.size > 15
-      ? Array.from(tileContainers.values()).filter((tileContainer) => {
-          const worldX = tileContainer.tileX * TILE_WIDTH;
-          const worldY = tileContainer.tileY * TILE_HEIGHT;
-          const screenX = worldX - camX;
-          const screenY = worldY - camY;
-          // Only update containers within viewport + small margin on mobile during drag
-          return screenX > -vw * 1.5 && screenX < vw * 2.5 && screenY > -vh * 1.5 && screenY < vh * 2.5;
-        })
-      : Array.from(tileContainers.values());
-    
-    containersToUpdate.forEach((tileContainer) => {
+    tileContainers.forEach((tileContainer) => {
       const worldX = tileContainer.tileX * TILE_WIDTH;
       const worldY = tileContainer.tileY * TILE_HEIGHT;
       const screenX = worldX - camX;
@@ -880,6 +881,14 @@ async function main() {
 
       // Transform the container instead of individual bags
       tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+      
+      // Mobile during drag: Hide containers that are far off-screen to reduce rendering cost
+      if (isMobile && dragging) {
+        const isVisible = screenX > -vw * 2 && screenX < vw * 3 && screenY > -vh * 2 && screenY < vh * 3;
+        tileContainer.container.style.display = isVisible ? 'block' : 'none';
+      } else {
+        tileContainer.container.style.display = 'block';
+      }
     });
     
     // Update last camera position for tracking
@@ -943,6 +952,11 @@ async function main() {
     targetCamY = camY;
     stage.classList.add("dragging");
     stage.setPointerCapture(e.pointerId);
+    
+    // Mobile: Force a render immediately to ensure containers are positioned correctly
+    if (isMobile) {
+      render();
+    }
   }, { passive: false });
 
   stage.addEventListener("pointermove", (e) => {
