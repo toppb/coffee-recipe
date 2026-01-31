@@ -19,27 +19,25 @@ function parseMarkdown(md) {
   html = html.replace(/^---$/gim, '<hr>');
   html = html.replace(/^\*\*\*$/gim, '<hr>');
   
-  // Lists - unordered (handle nested lists with indentation)
-  // Process nested lists first (4 spaces or tab)
+  // Lists - unordered
   html = html.replace(/^    [\*\-\+] (.+)$/gim, '<li class="nested">$1</li>');
   html = html.replace(/^\t[\*\-\+] (.+)$/gim, '<li class="nested">$1</li>');
-  // Then regular list items
   html = html.replace(/^[\*\-\+] (.+)$/gim, '<li>$1</li>');
   
   // Lists - ordered
   html = html.replace(/^\d+\. (.+)$/gim, '<li>$1</li>');
   
-  // Bold and italic (bold first, then italic)
+  // Bold and italic
   html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
   html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
   
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   
-  // Inline code (after code blocks)
+  // Inline code
   html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
   
-  // Line breaks - convert double newlines to paragraph breaks
+  // Line breaks
   const lines = html.split('\n');
   const processed = [];
   let inList = false;
@@ -48,34 +46,17 @@ function parseMarkdown(md) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Skip empty lines
-    if (!line) {
-      if (inNestedList) {
-        processed.push('</ul>');
-        inNestedList = false;
-      }
-      if (inList) {
-        processed.push('</ul>');
-        inList = false;
-      }
-      continue;
-    }
-    
-    // Check if it's a nested list item
     if (line.startsWith('<li class="nested">')) {
-      if (!inList) {
-        processed.push('<ul>');
-        inList = true;
-      }
       if (!inNestedList) {
-        processed.push('<ul class="nested">');
+        if (!inList) {
+          processed.push('<ul>');
+          inList = true;
+        }
+        processed.push('<ul>');
         inNestedList = true;
       }
       processed.push(line);
-    } 
-    // Check if it's a regular list item
-    else if (line.startsWith('<li>')) {
-      // Close nested list if open
+    } else if (line.startsWith('<li>')) {
       if (inNestedList) {
         processed.push('</ul>');
         inNestedList = false;
@@ -86,7 +67,6 @@ function parseMarkdown(md) {
       }
       processed.push(line);
     } else {
-      // Close any open lists
       if (inNestedList) {
         processed.push('</ul>');
         inNestedList = false;
@@ -95,75 +75,66 @@ function parseMarkdown(md) {
         processed.push('</ul>');
         inList = false;
       }
-      // Check if it's already a block element
-      if (line.match(/^<(h[1-6]|pre|hr|ul|ol)/)) {
+      
+      if (line === '') {
+        processed.push('');
+      } else if (line.startsWith('<h') || line.startsWith('<pre') || line.startsWith('<hr') || line.startsWith('<ul') || line.startsWith('</ul')) {
         processed.push(line);
       } else {
-        // Wrap in paragraph
         processed.push(`<p>${line}</p>`);
       }
     }
   }
   
-  // Close any remaining open lists
-  if (inNestedList) {
-    processed.push('</ul>');
-  }
-  if (inList) {
-    processed.push('</ul>');
-  }
+  if (inNestedList) processed.push('</ul>');
+  if (inList) processed.push('</ul>');
   
-  return processed.join('\n');
-}
-
-/**
- * Infinite scrollable masonry grid with drag
- * - Smaller bags, closer to original size
- * - Infinite scroll horizontal and vertical
- * - Seamless duplication
- */
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-function imgFor(number) {
-  return `/bags/coffee-bag-${pad2(number)}.png`;
+  html = processed.join('\n');
+  html = html.replace(/<p><\/p>/g, '');
+  
+  return html;
 }
 
 async function main() {
-  // Enhancement #1: Cache hints for fetch
-  const res = await fetch("/data/coffee.json", {
-    cache: "default" // Allow browser caching
-  });
+  // Fetch data
+  const res = await fetch("/data/coffee.json", { cache: "default" });
   const data = await res.json();
 
-  const app = document.querySelector("#app");
-  
-  // Create stage as a direct child of body (moved from inside app)
-  const stage = document.createElement("div");
-  stage.id = "stage";
-  stage.setAttribute("aria-label", "Infinite coffee grid");
-  
-  // Insert stage at index 3 in body (after app and script, before any other elements)
-  const body = document.body;
-  if (body.children.length >= 3) {
-    body.insertBefore(stage, body.children[3]);
-  } else {
-    body.appendChild(stage);
+  // Helper functions
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const imgFor = (n) => `/bags/coffee-bag-${pad2(n)}.png`;
+
+  // Create canvas
+  const canvas = document.createElement("canvas");
+  canvas.id = "stage";
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+
+  // High-DPI support
+  let dpr = window.devicePixelRatio || 1;
+  let canvasWidth = window.innerWidth;
+  let canvasHeight = window.innerHeight;
+
+  function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    canvas.style.width = canvasWidth + "px";
+    canvas.style.height = canvasHeight + "px";
+    ctx.scale(dpr, dpr);
   }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
 
-  // Tile dimensions - smaller for more frequent duplication
-  // Must be declared before camera position initialization
-  const TILE_WIDTH = 1800;
-  const TILE_HEIGHT = 2400;
-  // Detect mobile once at the start for use in layout calculations
-  const isMobile = window.innerWidth <= 760 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const GUTTER = 90; // Same gutter gap for desktop and mobile
-  const COLS = 6; // Number of columns in the tile
+  // Tile dimensions - 10 columns makes bags ~25% smaller
+  const TILE_WIDTH = 2400;
+  let TILE_HEIGHT = 4000; // Will be calculated after layout
+  const GUTTER = 60;
+  const COLS = 10;
 
-  // Camera position (world-space)
-  // Will be initialized after layout is created and window dimensions are known
+  // Camera position
   let camX = 0;
   let camY = 0;
   let targetCamX = 0;
@@ -176,809 +147,224 @@ async function main() {
   let movedDuringDrag = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let lastDragEndTime = 0;
-  // Track bag tap positions for better click detection
-  let bagTapStartX = 0;
-  let bagTapStartY = 0;
-  let bagTapStartTime = 0;
-  // Track last camera position to skip unnecessary updates
-  let lastCamX = 0;
-  let lastCamY = 0;
 
-  // Initialize items with doubled sizes
-  // Same sizes for desktop and mobile
-  const baseSize = 200;
-  const sizeRange = 16;
-  
+  // Velocity for momentum
+  let velocityX = 0;
+  let velocityY = 0;
+  let lastMoveTime = 0;
+
+  // Items setup - use actual image dimensions (no resizing)
   const baseItems = data.map((d) => {
     const number = Number(d.number);
     return {
       ...d,
       number,
       img: imgFor(number),
-      // Doubled size - around 200-232px on desktop, 280-304px on mobile
-      size: baseSize + (number % 3) * sizeRange,
     };
   });
 
-  // Duplicate items to fill the view better (create variations)
+  // Create duplicated items for tile
   const duplicatedItems = [];
-  // Drastically reduce duplicates on mobile for better performance (fewer DOM elements)
-  // Mobile: 1 duplicate = 20 bags per tile (vs 60 on desktop)
-  const duplicateCount = isMobile ? 1 : 3;
+  const duplicateCount = 3;
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
         ...item,
-        // Add a unique ID to track duplicates
         _duplicateId: i,
       });
     });
   }
 
-  // Shuffle for better distribution
+  // Shuffle
   for (let i = duplicatedItems.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [duplicatedItems[i], duplicatedItems[j]] = [duplicatedItems[j], duplicatedItems[i]];
   }
 
-  // Create masonry layout within a tile
-  // We'll create a promise-based layout that waits for images to load
-  async function createTileLayout() {
-    // Same padding for desktop and mobile
-    const padding = 20;
-    const placeW = TILE_WIDTH - padding * 2;
-    const placeH = TILE_HEIGHT - padding * 2;
-    const colWidth = (placeW - (COLS - 1) * GUTTER) / COLS;
-    const colHeights = new Array(COLS).fill(0);
+  // Preload images and get their dimensions
+  const imageCache = new Map();
+  const imageDimensions = new Map();
+  
+  const imageLoadPromises = baseItems.map((item) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        imageCache.set(item.number, img);
+        // Store actual dimensions for aspect ratio calculation
+        imageDimensions.set(item.number, {
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          aspectRatio: img.naturalHeight / img.naturalWidth
+        });
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = item.img;
+    });
+  });
 
-    const positionedItems = [];
+  // Wait for all images to load
+  await Promise.all(imageLoadPromises);
 
-    // Preload images and get their dimensions
-    // Enhancement #2: Prioritize first few images for faster initial render
-    const imagePromises = duplicatedItems.map((it, index) => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        // Set fetch priority for first few images
-        if (index < 10) {
-          img.fetchPriority = "high";
+  // Create masonry layout for a tile using actual image sizes
+  // Store column ending heights for seamless tiling
+  let columnEndHeights = [];
+  
+  function createTileLayout() {
+    const sidePadding = 30;
+    const colWidth = (TILE_WIDTH - sidePadding * 2 - GUTTER * (COLS - 1)) / COLS;
+    
+    // Start columns at 0
+    const colHeights = Array(COLS).fill(0);
+
+    const tileItems = [];
+
+    duplicatedItems.forEach((item) => {
+      // Find shortest column
+      let minCol = 0;
+      let minH = colHeights[0];
+      for (let c = 1; c < COLS; c++) {
+        if (colHeights[c] < minH) {
+          minH = colHeights[c];
+          minCol = c;
         }
-        img.onload = () => {
-          resolve({
-            ...it,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight,
-          });
-        };
-        img.onerror = () => {
-          // Fallback dimensions if image fails to load
-          resolve({
-            ...it,
-            naturalWidth: it.size * 0.75,
-            naturalHeight: it.size,
-          });
-        };
-        img.src = it.img;
+      }
+
+      // Get actual image dimensions - scale to fit column while preserving aspect ratio
+      const dims = imageDimensions.get(item.number);
+      if (!dims) return;
+      
+      // Scale image to fit column width
+      const scale = colWidth / dims.width;
+      const w = colWidth;
+      const h = dims.height * scale;
+      
+      const x = sidePadding + minCol * (colWidth + GUTTER);
+      const y = colHeights[minCol];
+
+      tileItems.push({
+        ...item,
+        x,
+        y,
+        width: w,
+        height: h,
+        col: minCol,
       });
+
+      colHeights[minCol] += h + GUTTER;
     });
 
-    const itemsWithDimensions = await Promise.all(imagePromises);
+    // Store where each column ends
+    columnEndHeights = [...colHeights];
+    const maxHeight = Math.max(...colHeights);
+    
+    // For seamless tiling: each column starts offset by (maxHeight - its end height)
+    // This is the "start offset" for items in subsequent tiles
+    TILE_HEIGHT = maxHeight;
 
-    // Place items in masonry layout with duplicate spacing
-    // Track recent placements to avoid placing duplicates close together
-    const recentPlacements = []; // Track placements: { number, x, y }
-    const MIN_DUPLICATE_DISTANCE = 600; // Minimum 2D distance between duplicates
-
-    itemsWithDimensions.forEach((it) => {
-      // Calculate item dimensions - constrain to column width to prevent cross-column overlaps
-      const aspectRatio = it.naturalHeight / it.naturalWidth;
-      const targetHeight = it.size;
-      const calculatedWidth = targetHeight / aspectRatio;
-      // Strictly limit width to column width (no 1.1x multiplier)
-      const itemWidth = Math.min(colWidth, calculatedWidth);
-      const itemHeight = itemWidth * aspectRatio;
-      
-      // Constraint: items must fit within tile boundaries (respecting padding)
-      const maxY = TILE_HEIGHT - padding - itemHeight;
-
-      // Helper function to check if a position has overlaps
-      function checkOverlaps(x, y, width, height, excludeItem = null) {
-        let maxOverlapBottom = 0;
-        let hasAnyOverlap = false;
-        
-        for (const placed of positionedItems) {
-          if (excludeItem && placed === excludeItem) continue;
-          
-          const itemLeft = x;
-          const itemRight = x + width;
-          const itemTop = y;
-          const itemBottom = y + height;
-          
-          const placedLeft = placed.x;
-          const placedRight = placed.x + placed.width;
-          const placedTop = placed.y;
-          const placedBottom = placed.y + placed.height;
-          
-          // Check for overlap (with gutter spacing)
-          // Items overlap if their bounding boxes (with gutter) intersect
-          const horizontalOverlap = itemLeft < placedRight + GUTTER && itemRight + GUTTER > placedLeft;
-          const verticalOverlap = itemTop < placedBottom + GUTTER && itemBottom + GUTTER > placedTop;
-          
-          if (horizontalOverlap && verticalOverlap) {
-            hasAnyOverlap = true;
-            // Track the bottommost overlapping item to place below it
-            maxOverlapBottom = Math.max(maxOverlapBottom, placedBottom);
-          }
-        }
-        
-        return { 
-          hasOverlap: hasAnyOverlap, 
-          overlapBottom: maxOverlapBottom 
-        };
-      }
-
-      // Helper function to check if position is too close to duplicates
-      function checkDuplicateProximity(x, y, itemNumber, itemWidth, itemHeight, minDistance = 500) {
-        for (const placed of positionedItems) {
-          if (placed.number === itemNumber) {
-            const dx = Math.abs(x - placed.x);
-            const dy = Math.abs(y - placed.y);
-            
-            // Calculate which columns the items are in
-            const currentCol = Math.floor((x - padding) / (colWidth + GUTTER));
-            const placedCol = Math.floor((placed.x - padding) / (colWidth + GUTTER));
-            const colDistance = Math.abs(currentCol - placedCol);
-            
-            // Check if items are in adjacent columns (colDistance <= 1)
-            if (colDistance <= 1) {
-              // Check if Y positions overlap or are very close (within item height range)
-              const currentTop = y;
-              const currentBottom = y + itemHeight;
-              const placedTop = placed.y;
-              const placedBottom = placed.y + placed.height;
-              
-              // Check for vertical overlap or close proximity
-              const verticalOverlap = !(currentBottom < placedTop - GUTTER || currentTop > placedBottom + GUTTER);
-              const verticalClose = Math.abs(currentTop - placedTop) < Math.max(itemHeight, placed.height) + GUTTER * 2;
-              
-              if (verticalOverlap || verticalClose) {
-                return { tooClose: true, distance: Math.sqrt(dx * dx + dy * dy), reason: 'adjacent_column' };
-              }
-            }
-            
-            // Check if vertically adjacent (same column or very close columns)
-            if (colDistance === 0 || (colDistance === 1 && dx < colWidth + GUTTER)) {
-              const verticalClose = dy < Math.max(itemHeight, placed.height) + GUTTER * 2;
-              if (verticalClose) {
-                return { tooClose: true, distance: Math.sqrt(dx * dx + dy * dy), reason: 'vertical_adjacent' };
-              }
-            }
-            
-            // Check 2D distance as fallback
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < minDistance) {
-              return { tooClose: true, distance, reason: 'distance' };
-            }
-          }
-        }
-        return { tooClose: false };
-      }
-
-      // For each column, calculate where the item would be placed
-      const columnOptions = [];
-      
-      for (let col = 0; col < COLS; col++) {
-        // Calculate X position (centered in column, strictly within column bounds)
-        const colLeft = padding + col * (colWidth + GUTTER);
-        const x = colLeft + (colWidth - itemWidth) / 2;
-        
-        // Start Y at the column height
-        let y = padding + colHeights[col];
-        
-        // Keep checking and adjusting Y until no overlaps
-        let maxIterations = 100; // Safety limit
-        let iterations = 0;
-        while (iterations < maxIterations) {
-          const overlapCheck = checkOverlaps(x, y, itemWidth, itemHeight);
-          if (!overlapCheck.hasOverlap) {
-            break; // No overlap, position is good
-          }
-          // Move below the overlapping item
-          y = overlapCheck.overlapBottom + GUTTER;
-          iterations++;
-        }
-        
-        // Check if this position is too close to duplicates
-        const duplicateCheck = checkDuplicateProximity(x, y, it.number, itemWidth, itemHeight);
-        
-        // Only add column option if item fits within tile boundary and isn't adjacent to duplicates
-        if (y <= maxY && !duplicateCheck.tooClose) {
-          const minDuplicateDistance = duplicateCheck.distance || Infinity;
-          columnOptions.push({
-            col,
-            x,
-            y,
-            height: y,
-            minDuplicateDistance,
-          });
-        }
-      }
-
-      // If no column options available (item too tall for tile), skip it
-      if (columnOptions.length === 0) {
-        return; // Skip this item, it doesn't fit in any column
-      }
-
-      // Select best column: prioritize avoiding adjacent duplicates
-      // Sort by: 1) Not adjacent to duplicates, 2) Shortest column
-      columnOptions.sort((a, b) => {
-        // Prioritize columns with better duplicate distance
-        if (a.minDuplicateDistance !== b.minDuplicateDistance) {
-          return b.minDuplicateDistance - a.minDuplicateDistance;
-        }
-        // Then by shortest column
-        return a.height - b.height;
-      });
-      
-      let selectedCol = columnOptions[0];
-
-      // Place the item - resolve all overlaps iteratively
-      let finalX = selectedCol.x;
-      let finalY = selectedCol.y;
-      
-      // Iteratively resolve all overlaps until none remain
-      let maxResolveIterations = 200;
-      let resolveIterations = 0;
-      while (resolveIterations < maxResolveIterations) {
-        const overlapCheck = checkOverlaps(finalX, finalY, itemWidth, itemHeight);
-        if (!overlapCheck.hasOverlap) {
-          // Check duplicates again after resolving overlaps
-          const duplicateCheck = checkDuplicateProximity(finalX, finalY, it.number, itemWidth, itemHeight);
-          if (!duplicateCheck.tooClose) {
-            break; // No overlaps and no adjacent duplicates, position is good
-          }
-          // If too close to duplicate, move down further
-          // Move down by at least the item height plus gutter to ensure separation
-          finalY += Math.max(itemHeight, 200) + GUTTER * 2;
-        } else {
-          // Move below the overlapping item
-          finalY = overlapCheck.overlapBottom + GUTTER;
-        }
-        
-        // If item would extend beyond tile boundary, skip placing it
-        if (finalY > maxY) {
-          // Item doesn't fit in this tile, skip it entirely
-          return; // Exit early, don't add to positionedItems
-        }
-        resolveIterations++;
-      }
-      
-      // Final check: ensure not adjacent to duplicates
-      const finalDuplicateCheck = checkDuplicateProximity(finalX, finalY, it.number, itemWidth, itemHeight);
-      if (finalDuplicateCheck.tooClose) {
-        // Try moving down significantly more to avoid adjacent duplicates
-        finalY += Math.max(itemHeight, 250) + GUTTER * 3;
-        if (finalY > maxY || finalY + itemHeight > TILE_HEIGHT - padding) {
-          return; // Still too close or doesn't fit, skip this item
-        }
-        // Re-check after moving
-        const recheck = checkDuplicateProximity(finalX, finalY, it.number, itemWidth, itemHeight);
-        if (recheck.tooClose) {
-          return; // Still too close, skip this item
-        }
-      }
-      
-      // Double-check item fits within tile before placing
-      // Check both top edge and bottom edge
-      if (finalY > maxY || finalY + itemHeight > TILE_HEIGHT - padding) {
-        return; // Skip this item, it doesn't fit
-      }
-      
-      // Final position after resolving all overlaps
-      positionedItems.push({
-        ...it,
-        x: finalX,
-        y: finalY,
-        width: itemWidth,
-        height: itemHeight,
-      });
-      
-      // Update column height (but don't let it exceed tile boundary)
-      const itemBottom = finalY + itemHeight + GUTTER;
-      colHeights[selectedCol.col] = Math.min(itemBottom - padding, TILE_HEIGHT - padding * 2);
-
-      // Track this placement
-      recentPlacements.push({
-        number: it.number,
-        x: finalX,
-        y: finalY,
-      });
-      
-      // Keep only recent placements
-      if (recentPlacements.length > 30) {
-        recentPlacements.shift();
-      }
-    });
-
-    return positionedItems;
+    return tileItems;
   }
 
-  // Wait for layout to be created
-  const tileItems = await createTileLayout();
+  const tileItems = createTileLayout();
 
-  // Initialize camera to center on a specific bag for a nicer initial view
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  
-  // Find a bag positioned around the middle of the tile to center on
-  // Pick a bag that's not too close to the edges
-  let centerBag = null;
-  const centerX = TILE_WIDTH / 2;
-  const centerY = TILE_HEIGHT / 2;
-  let minDistance = Infinity;
-  
-  // Find the bag closest to the center of the tile
-  for (const item of tileItems) {
-    const bagCenterX = item.x + item.width / 2;
-    const bagCenterY = item.y + item.height / 2;
-    const distance = Math.sqrt(
-      Math.pow(bagCenterX - centerX, 2) + Math.pow(bagCenterY - centerY, 2)
-    );
-    if (distance < minDistance) {
-      minDistance = distance;
-      centerBag = item;
-    }
-  }
-  
-  // If we found a bag, center on it; otherwise fall back to tile center
-  if (centerBag) {
-    const bagCenterX = centerBag.x + centerBag.width / 2;
-    const bagCenterY = centerBag.y + centerBag.height / 2;
-    // Center the bag in the viewport
-    camX = bagCenterX - vw / 2;
-    camY = bagCenterY - vh / 2;
-  } else {
-    // Fallback to tile center
-    camX = TILE_WIDTH / 2 - vw / 2;
-    camY = TILE_HEIGHT / 2 - vh / 2;
-  }
-  
+  // Center camera on first tile
+  camX = (TILE_WIDTH - canvasWidth) / 2;
+  camY = 200;
   targetCamX = camX;
   targetCamY = camY;
-  
-  // Mobile: Set initial stage transform
-  if (isMobile) {
-    stage.style.transformOrigin = "0 0";
-    stage.style.transform = `translate3d(${-camX}px, ${-camY}px, 0)`;
-  }
-  
-  // Initialize camera change tracking after camera is set
-  lastCamX = camX;
-  lastCamY = camY;
 
-  // Create DOM elements for items (we'll duplicate these)
-  const itemElements = new Map(); // Map from item number to element
-
-  // Helper function to ensure cursor is set on bag elements (desktop only)
-  function setupBagCursor(bagEl) {
-    // Set cursor inline - this has high priority
-    bagEl.style.cursor = "pointer";
-    // Use mouseenter/mouseleave to track hover state (not needed on mobile)
-    bagEl.addEventListener("mouseenter", () => {
-      bagEl.style.cursor = "pointer";
-      bagHoverCount++;
-      updateStageCursor();
-    }, { passive: true });
-    bagEl.addEventListener("mouseleave", () => {
-      bagHoverCount--;
-      updateStageCursor();
-    }, { passive: true });
-  }
-
-  function createItemElement(item) {
-    // Use duplicate ID to create unique elements for duplicates
-    const key = `${item.number}_${item._duplicateId || 0}`;
-    let el;
-    
-    if (itemElements.has(key)) {
-      // Clone the element
-      el = itemElements.get(key).cloneNode(true);
-      // Ensure cursor is set on cloned elements
-      if (!isMobile) setupBagCursor(el);
-      // Store item data on element for event delegation
-      el.dataset.itemNumber = item.number;
-      return el;
-    }
-
-    el = document.createElement("button");
-    el.className = "bag";
-    el.type = "button";
-    el.setAttribute("aria-label", item.name || `Coffee ${item.number}`);
-    // Store item data on element for event delegation
-    el.dataset.itemNumber = item.number;
-
-    const img = document.createElement("img");
-    img.src = item.img;
-    img.alt = item.name ? `${item.name} bag` : `Coffee bag ${item.number}`;
-    img.style.width = `${item.width}px`;
-    img.style.height = `${item.height}px`;
-    // Enhancement #2: Image loading optimizations
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.fetchPriority = item.number <= 3 ? "high" : "low";
-    img.style.objectFit = "contain";
-
-    el.appendChild(img);
-    if (!isMobile) setupBagCursor(el);
-
-    itemElements.set(key, el);
-    return el;
-  }
-  
-  // Event delegation for bag clicks - single listener instead of one per bag
-  // This dramatically reduces memory usage and improves touch response
-  let bagTapTarget = null;
-  
-  if (isMobile) {
-    // Mobile: Use touch events for bag taps
-    stage.addEventListener("touchstart", (e) => {
-      const target = e.target.closest('.bag');
-      if (target) {
-        const touch = e.touches[0];
-        bagTapStartX = touch.clientX;
-        bagTapStartY = touch.clientY;
-        bagTapStartTime = Date.now();
-        bagTapTarget = target;
-      }
-    }, { passive: true });
-    
-    stage.addEventListener("touchend", (e) => {
-      if (!bagTapTarget) return;
-      
-      const touch = e.changedTouches[0];
-      const dx = Math.abs(touch.clientX - bagTapStartX);
-      const dy = Math.abs(touch.clientY - bagTapStartY);
-      const timeDiff = Date.now() - bagTapStartTime;
-      const distance = dx + dy;
-      
-      // Quick tap with minimal movement = click
-      if (timeDiff < 300 && distance < 15 && !movedDuringDrag) {
-        const itemNumber = parseInt(bagTapTarget.dataset.itemNumber, 10);
-        // Use baseItems which has the img field (data doesn't have it)
-        const item = baseItems.find(d => d.number === itemNumber);
-        if (item) {
-          openModal(item);
-        }
-      }
-      bagTapTarget = null;
-    }, { passive: true });
-  } else {
-    // Desktop: Use pointer events for bag clicks
-    stage.addEventListener("pointerdown", (e) => {
-      const target = e.target.closest('.bag');
-      if (target) {
-        bagTapStartX = e.clientX;
-        bagTapStartY = e.clientY;
-        bagTapStartTime = Date.now();
-        bagTapTarget = target;
-      }
-    }, { passive: true, capture: true });
-    
-    stage.addEventListener("pointerup", (e) => {
-      if (!bagTapTarget) return;
-      
-      const dx = Math.abs(e.clientX - bagTapStartX);
-      const dy = Math.abs(e.clientY - bagTapStartY);
-      const timeDiff = Date.now() - bagTapStartTime;
-      const distance = dx + dy;
-      
-      // Quick tap with minimal movement = click
-      if (timeDiff < 300 && distance < 10 && !dragging && !movedDuringDrag) {
-        const itemNumber = parseInt(bagTapTarget.dataset.itemNumber, 10);
-        // Use baseItems which has the img field (data doesn't have it)
-        const item = baseItems.find(d => d.number === itemNumber);
-        if (item) {
-          openModal(item);
-        }
-      }
-      bagTapTarget = null;
-    }, { passive: true, capture: true });
-  }
-
-  // Active clones (visible items) - use Map for faster lookups
-  const activeClones = [];
-  const cloneMap = new Map(); // Key: `${item.number}_${item._duplicateId}_${tx}_${ty}`
-  
-  // Container-based transforms: Map of tile containers
-  // Key: `${tx}_${ty}`, Value: { container: HTMLElement, tileX: number, tileY: number }
-  const tileContainers = new Map();
-
-  // Render function - creates/updates visible clones
-  let lastTileX = Infinity;
-  let lastTileY = Infinity;
-  // Enhancement #4: Pause rendering when modal is open
+  // Render paused flag (for modal)
   let renderPaused = false;
 
-  // Enhancement #3: Cache viewport dimensions to avoid recalculating every frame
-  let cachedVw = window.innerWidth;
-  let cachedVh = window.innerHeight;
-  
-  // Update cached viewport on resize (throttled)
-  let resizeTimeout;
-  window.addEventListener("resize", () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      cachedVw = window.innerWidth;
-      cachedVh = window.innerHeight;
-    }, 100);
-  }, { passive: true });
-
-  // Mobile: Throttle render loop to reduce CPU usage
-  let mobileFrameCount = 0;
-  const MOBILE_FRAME_SKIP = 2; // Only render every 2nd frame on mobile during drag
-
+  // Render function
   function render() {
-    // Enhancement #4: Skip rendering when modal is open for better scroll performance
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
     }
-    
-    // Mobile: Throttle rendering during drag to reduce CPU load
-    if (isMobile && dragging) {
-      mobileFrameCount++;
-      if (mobileFrameCount % MOBILE_FRAME_SKIP !== 0) {
-        requestAnimationFrame(render);
-        return;
-      }
-    } else {
-      mobileFrameCount = 0;
-    }
-    
-    // Mobile: Skip expensive clone creation/removal during drag for better performance
-    const skipCloneManagement = isMobile && dragging;
-    
-    const vw = cachedVw;
-    const vh = cachedVh;
 
-    // Calculate which tiles are visible
-    const centerX = camX + vw / 2;
-    const centerY = camY + vh / 2;
+    // Clear canvas
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = "#F6F0E6";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    const tileX = Math.floor(centerX / TILE_WIDTH);
-    const tileY = Math.floor(centerY / TILE_HEIGHT);
-
-    // During drag, skip expensive operations (clone creation/removal)
-    const isDragging = dragging;
-    const tileChanged = tileX !== lastTileX || tileY !== lastTileY;
-    lastTileX = tileX;
-    lastTileY = tileY;
-
-    // Render tiles in a grid around the center (larger radius to fill view)
-    // Drastically reduce render radius on mobile for better performance
-    // Mobile: radius 1 = ~12 tiles (vs ~28 on desktop)
-    const renderRadius = isMobile ? 1 : 3;
-    const tilesToRender = [];
-    
-    // Same render radius extension for desktop and mobile
-    const radiusYDown = renderRadius + 1;
-    const radiusYUp = renderRadius;
-
-    for (let tx = tileX - renderRadius; tx <= tileX + renderRadius; tx++) {
-      for (let ty = tileY - radiusYUp; ty <= tileY + radiusYDown; ty++) {
-        tilesToRender.push({ tx, ty });
+    // Apply momentum when not dragging
+    if (!dragging) {
+      velocityX *= 0.95;
+      velocityY *= 0.95;
+      
+      if (Math.abs(velocityX) > 0.1 || Math.abs(velocityY) > 0.1) {
+        camX += velocityX;
+        camY += velocityY;
+        targetCamX = camX;
+        targetCamY = camY;
       }
     }
 
-    // Create/remove clones when tile changes or when not dragging
-    // Skip on mobile during drag for better performance
-    if ((!isDragging || tileChanged) && !skipCloneManagement) {
-      // Remove tiles and clones that are too far away (larger buffer for smooth transitions)
-      // Same buffer for desktop and mobile
-      const buffer = 800;
-      const tilesToRemove = [];
-      const clonesToRemove = [];
-      
-      // Check which tiles are out of view
-      tileContainers.forEach((tileContainer, tileKey) => {
-        const worldX = tileContainer.tileX * TILE_WIDTH;
-        const worldY = tileContainer.tileY * TILE_HEIGHT;
-        const screenX = worldX - camX;
-        const screenY = worldY - camY;
+    // Smooth camera interpolation
+    const lerpFactor = 0.15;
+    camX += (targetCamX - camX) * lerpFactor;
+    camY += (targetCamY - camY) * lerpFactor;
 
-        if (
-          screenX < -buffer ||
-          screenY < -buffer ||
-          screenX > vw + buffer ||
-          screenY > vh + buffer
-        ) {
-          tilesToRemove.push(tileKey);
-        }
-      });
+    // Calculate visible tile range - render tiles in all directions
+    const tileX = Math.floor(camX / TILE_WIDTH);
+    const tileY = Math.floor(camY / TILE_HEIGHT);
+    
+    // Calculate how many tiles are needed to cover the screen
+    const tilesNeededX = Math.ceil(canvasWidth / TILE_WIDTH) + 2;
+    const tilesNeededY = Math.ceil(canvasHeight / TILE_HEIGHT) + 2;
+
+    // Draw items using continuous column positioning (seamless infinite scroll)
+    // Instead of tiling, we calculate each item's position in a continuous column
+    
+    // Calculate view bounds in world space
+    const viewLeft = camX - 200;
+    const viewRight = camX + canvasWidth + 200;
+    const viewTop = camY - 200;
+    const viewBottom = camY + canvasHeight + 200;
+    
+    // For each column, calculate which items are visible
+    for (let col = 0; col < COLS; col++) {
+      const colItems = tileItems.filter(item => item.col === col);
+      if (colItems.length === 0) continue;
       
-      // Remove clones from tiles that are being removed
-      // Desktop: Clones are removed with container
-      // Mobile: Clones must be removed individually (not in containers)
-      activeClones.forEach((clone, index) => {
-        if (isMobile) {
-          // Mobile: Check if clone is out of view
-          const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
-          const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
-          const screenX = worldX - camX;
-          const screenY = worldY - camY;
+      // Column height (for one set of items)
+      const colHeight = columnEndHeights[col];
+      
+      // Calculate which tile rows this column needs to render
+      const startTileY = Math.floor(viewTop / colHeight) - 1;
+      const endTileY = Math.ceil(viewBottom / colHeight) + 1;
+      
+      for (let ty = startTileY; ty <= endTileY; ty++) {
+        colItems.forEach((item) => {
+          // Calculate position using this column's height for tiling
+          const worldY = item.y + ty * colHeight;
           
-          if (
-            screenX < -buffer ||
-            screenY < -buffer ||
-            screenX > vw + buffer ||
-            screenY > vh + buffer
-          ) {
-            // Mobile: Remove element manually
-            if (clone.el.parentNode) {
-              clone.el.remove();
-            }
-            const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
-            cloneMap.delete(key);
-            clonesToRemove.push(index);
-          }
-        } else {
-          // Desktop: Check by tile
-          const tileKey = `${clone.tileX}_${clone.tileY}`;
-          if (tilesToRemove.includes(tileKey)) {
-            // Don't manually remove el - it will be removed with container
-            const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
-            cloneMap.delete(key);
-            clonesToRemove.push(index);
-          }
-        }
-      });
-
-      // Remove clones in reverse order to maintain indices
-      for (let i = clonesToRemove.length - 1; i >= 0; i--) {
-        activeClones.splice(clonesToRemove[i], 1);
-      }
-      
-      // Remove tile containers (desktop only)
-      if (!isMobile) {
-        tilesToRemove.forEach(tileKey => {
-          const tileContainer = tileContainers.get(tileKey);
-          if (tileContainer && tileContainer.container.parentNode) {
-            tileContainer.container.remove();
-          }
-          tileContainers.delete(tileKey);
-        });
-      }
-
-      // Create new clones for visible tiles
-      // Enhancement #5: Use DocumentFragment for batch DOM operations to reduce reflows
-      const fragment = document.createDocumentFragment();
-      const clonesToAdd = [];
-      
-      tilesToRender.forEach(({ tx, ty }) => {
-        const tileKey = `${tx}_${ty}`;
-        let tileContainer = null;
-        
-        // Desktop: Use tile containers; Mobile: Skip containers entirely
-        if (!isMobile) {
-          tileContainer = tileContainers.get(tileKey);
+          // Skip if out of vertical view
+          if (worldY + item.height < viewTop || worldY > viewBottom) return;
           
-          if (!tileContainer) {
-            // Create new tile container
-            const container = document.createElement("div");
-            container.className = "tile-container";
-            container.style.position = "absolute";
-            container.style.left = "0";
-            container.style.top = "0";
-            container.style.width = `${TILE_WIDTH}px`;
-            container.style.height = `${TILE_HEIGHT}px`;
-            container.style.transformOrigin = "0 0";
+          // Horizontal tiling
+          const startTileX = Math.floor(viewLeft / TILE_WIDTH) - 1;
+          const endTileX = Math.ceil(viewRight / TILE_WIDTH) + 1;
+          
+          for (let tx = startTileX; tx <= endTileX; tx++) {
+            const worldX = item.x + tx * TILE_WIDTH;
             
-            // Set initial transform position
-            const worldX = tx * TILE_WIDTH;
-            const worldY = ty * TILE_HEIGHT;
+            // Skip if out of horizontal view
+            if (worldX + item.width < viewLeft || worldX > viewRight) continue;
+            
             const screenX = worldX - camX;
             const screenY = worldY - camY;
-            container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
             
-            fragment.appendChild(container);
-            
-            tileContainer = {
-              container,
-              tileX: tx,
-              tileY: ty,
-            };
-            tileContainers.set(tileKey, tileContainer);
-          }
-        }
-        
-        tileItems.forEach((item) => {
-          // Use Map for O(1) lookup instead of O(n) find
-          const key = `${item.number}_${item._duplicateId || 0}_${tx}_${ty}`;
-          const existing = cloneMap.get(key);
-
-          if (!existing) {
-            // Create new clone
-            const el = createItemElement(item);
-            el.style.position = "absolute";
-            
-            if (isMobile) {
-              // Mobile: Use world coordinates (stage is transformed)
-              const worldX = item.x + tx * TILE_WIDTH;
-              const worldY = item.y + ty * TILE_HEIGHT;
-              el.style.left = `${worldX}px`;
-              el.style.top = `${worldY}px`;
-              // No GPU hints on mobile - they cause performance issues
-              // Append directly to fragment (will go to stage)
-              fragment.appendChild(el);
-            } else {
-              // Desktop: Position relative to tile container
-              el.style.left = `${item.x}px`;
-              el.style.top = `${item.y}px`;
-              el.style.transform = "translateZ(0)"; // GPU acceleration
-              el.style.willChange = "transform";
-              // Append to container
-              tileContainer.container.appendChild(el);
+            const img = imageCache.get(item.number);
+            if (img) {
+              ctx.drawImage(img, screenX, screenY, item.width, item.height);
             }
-
-            const clone = {
-              item,
-              el,
-              tileX: tx,
-              tileY: ty,
-            };
-            clonesToAdd.push({ clone, key });
           }
         });
-      });
-      
-      // Enhancement #5: Batch append all new tile containers at once to reduce reflows
-      if (fragment.hasChildNodes()) {
-        stage.appendChild(fragment);
-        clonesToAdd.forEach(({ clone, key }) => {
-          activeClones.push(clone);
-          cloneMap.set(key, clone);
-        });
       }
     }
-
-    // Smooth camera interpolation for jitter-free movement
-    // During drag, camera is updated directly in pointermove handler (no interpolation lag)
-    // Only interpolate when not dragging for smooth deceleration
-    if (!dragging) {
-      if (Math.abs(targetCamX - camX) > 0.01 || Math.abs(targetCamY - camY) > 0.01) {
-        // Smooth interpolation when idle (for scroll wheel, etc.)
-        const lerpFactor = 0.2;
-        camX += (targetCamX - camX) * lerpFactor;
-        camY += (targetCamY - camY) * lerpFactor;
-      } else {
-        // Snap to target when very close to avoid micro-movements
-        camX = targetCamX;
-        camY = targetCamY;
-      }
-    }
-
-    // Mobile: Use single stage transform (1 DOM update) instead of container transforms
-    // Desktop: Use container-based transforms for better precision
-    if (isMobile) {
-      // Mobile: Transform the entire stage - bags use world coordinates (left/top)
-      // This is a single DOM update vs multiple container updates
-      stage.style.transform = `translate3d(${-camX}px, ${-camY}px, 0)`;
-    } else {
-      // Desktop: Container-based transforms for each tile
-      tileContainers.forEach((tileContainer) => {
-        const worldX = tileContainer.tileX * TILE_WIDTH;
-        const worldY = tileContainer.tileY * TILE_HEIGHT;
-        const screenX = worldX - camX;
-        const screenY = worldY - camY;
-
-        // Transform the container instead of individual bags
-        tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-      });
-    }
-    
-    // Update last camera position for tracking
-    lastCamX = camX;
-    lastCamY = camY;
 
     requestAnimationFrame(render);
   }
@@ -986,186 +372,229 @@ async function main() {
   // Start render loop
   requestAnimationFrame(render);
 
-  // Floating instruction element
-  const instructionEl = document.createElement("div");
-  instructionEl.className = "instruction";
-  instructionEl.textContent = "Drag to explore • Open bag for details";
-  document.body.appendChild(instructionEl);
-
-  // Track if any bag is being hovered
-  let bagHoverCount = 0;
-  
-  function updateStageCursor() {
-    if (bagHoverCount > 0 && !dragging) {
-      stage.classList.add("bag-hovered");
-    } else {
-      stage.classList.remove("bag-hovered");
-    }
-  }
-  
-  // Fallback: detect bags on mousemove in case event handlers weren't attached
-  stage.addEventListener("mousemove", (e) => {
-    if (dragging) return;
-    const bag = e.target.closest('.bag');
-    if (bag) {
-      // Ensure cursor is set
-      bag.style.cursor = "pointer";
-      if (!stage.classList.contains("bag-hovered")) {
-        stage.classList.add("bag-hovered");
+  // Hit testing - find item at screen position
+  function hitTest(clickX, clickY) {
+    const worldX = clickX + camX;
+    const worldY = clickY + camY;
+    
+    // Check each column with its own tiling height
+    for (let col = COLS - 1; col >= 0; col--) {
+      const colItems = tileItems.filter(item => item.col === col);
+      const colHeight = columnEndHeights[col];
+      
+      // Find which tile row in this column
+      const tileY = Math.floor(worldY / colHeight);
+      const localY = worldY - tileY * colHeight;
+      
+      // Find which tile col horizontally
+      const tileX = Math.floor(worldX / TILE_WIDTH);
+      const localX = worldX - tileX * TILE_WIDTH;
+      
+      // Check items in this column (reverse order for z-index)
+      for (let i = colItems.length - 1; i >= 0; i--) {
+        const item = colItems[i];
+        
+        if (
+          localX >= item.x &&
+          localX <= item.x + item.width &&
+          localY >= item.y &&
+          localY <= item.y + item.height
+        ) {
+          return item;
+        }
       }
     }
+    return null;
+  }
+
+  // Touch/Mouse handling
+  let touchId = null;
+  let tapStartX = 0;
+  let tapStartY = 0;
+  let tapStartTime = 0;
+
+  // Touch events
+  canvas.addEventListener("touchstart", (e) => {
+    if (touchId !== null) return;
+    
+    const touch = e.touches[0];
+    touchId = touch.identifier;
+    dragging = true;
+    movedDuringDrag = false;
+    lastX = touch.clientX;
+    lastY = touch.clientY;
+    tapStartX = touch.clientX;
+    tapStartY = touch.clientY;
+    tapStartTime = Date.now();
+    velocityX = 0;
+    velocityY = 0;
+    lastMoveTime = Date.now();
   }, { passive: true });
 
-  // Drag handlers - use native touch events on mobile for better performance
-  if (isMobile) {
-    // Mobile: Native touch events are faster than pointer events
-    let touchId = null;
-    
-    stage.addEventListener("touchstart", (e) => {
-      // Only track first touch
-      if (touchId !== null) return;
-      
-      const touch = e.touches[0];
-      
-      // Check if touching a bag - use simple tag check (faster than closest)
-      const target = e.target;
-      if (target.tagName === 'BUTTON' || target.tagName === 'IMG') {
-        return;
+  canvas.addEventListener("touchmove", (e) => {
+    if (touchId === null) return;
+
+    let touch = null;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].identifier === touchId) {
+        touch = e.touches[i];
+        break;
       }
-      
-      touchId = touch.identifier;
-      dragging = true;
-      movedDuringDrag = false;
-      dragStartX = touch.clientX;
-      dragStartY = touch.clientY;
-      lastX = touch.clientX;
-      lastY = touch.clientY;
-      targetCamX = camX;
-      targetCamY = camY;
-      // Skip classList change on touchstart - it causes style recalc
-    }, { passive: true });
+    }
+    if (!touch) return;
 
-    stage.addEventListener("touchmove", (e) => {
-      if (touchId === null) return;
-      
-      // Find our tracked touch
-      let touch = null;
-      for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === touchId) {
-          touch = e.touches[i];
-          break;
-        }
-      }
-      if (!touch) return;
-      
-      e.preventDefault(); // Prevent scrolling
-
-      const dx = touch.clientX - lastX;
-      const dy = touch.clientY - lastY;
-
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
-        movedDuringDrag = true;
-      }
-
-      // Update camera directly
-      camX -= dx;
-      camY -= dy;
-      targetCamX = camX;
-      targetCamY = camY;
-
-      lastX = touch.clientX;
-      lastY = touch.clientY;
-    }, { passive: false });
-
-    stage.addEventListener("touchend", (e) => {
-      // Check if our tracked touch ended
-      let found = false;
-      for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === touchId) {
-          found = true;
-          break;
-        }
-      }
-      if (found) return; // Our touch is still active
-      
-      touchId = null;
-      dragging = false;
-      lastDragEndTime = Date.now();
-      setTimeout(() => (movedDuringDrag = false), 100);
-    }, { passive: true });
-
-    stage.addEventListener("touchcancel", () => {
-      touchId = null;
-      dragging = false;
-    }, { passive: true });
-  } else {
-    // Desktop: Use pointer events
-    stage.addEventListener("pointerdown", (e) => {
-      // Don't start dragging if clicking on a bag button - let bag handle it
-      if (e.target.closest('.bag')) {
-        return;
-      }
-      
-      e.preventDefault();
-      
-      dragging = true;
-      movedDuringDrag = false;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      targetCamX = camX;
-      targetCamY = camY;
-      stage.classList.add("dragging");
-      stage.setPointerCapture(e.pointerId);
-    }, { passive: false });
-
-    stage.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      
-      e.preventDefault();
-
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
-        movedDuringDrag = true;
-      }
-
-      camX -= dx;
-      camY -= dy;
-      targetCamX = camX;
-      targetCamY = camY;
-
-      lastX = e.clientX;
-      lastY = e.clientY;
-    }, { passive: false });
-
-    stage.addEventListener("pointerup", (e) => {
-      dragging = false;
-      stage.classList.remove("dragging");
-      stage.releasePointerCapture(e.pointerId);
-      updateStageCursor();
-      lastDragEndTime = Date.now();
-      setTimeout(() => (movedDuringDrag = false), 100);
-    }, { passive: true });
-  }
-
-  // Scroll wheel navigation
-  stage.addEventListener("wheel", (e) => {
     e.preventDefault();
-    
-    // Support both vertical and horizontal scrolling
-    // Shift + wheel or horizontal wheel for horizontal scroll
-    const deltaX = e.deltaX !== 0 ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
-    const deltaY = e.deltaY !== 0 && !e.shiftKey ? e.deltaY : 0;
-    
-    // Update target camera position (smooth interpolation happens in render loop)
-    targetCamX -= deltaX * 1.2;
-    targetCamY -= deltaY * 1.2;
+
+    const dx = touch.clientX - lastX;
+    const dy = touch.clientY - lastY;
+    const now = Date.now();
+    const dt = now - lastMoveTime;
+
+    if (Math.abs(dx) + Math.abs(dy) > 3) {
+      movedDuringDrag = true;
+    }
+
+    // Update camera
+    camX -= dx;
+    camY -= dy;
+    targetCamX = camX;
+    targetCamY = camY;
+
+    // Calculate velocity for momentum
+    if (dt > 0) {
+      velocityX = -dx * (16 / dt); // Normalize to ~60fps
+      velocityY = -dy * (16 / dt);
+    }
+
+    lastX = touch.clientX;
+    lastY = touch.clientY;
+    lastMoveTime = now;
   }, { passive: false });
 
-  // --- Modal (lightbox) ---
+  canvas.addEventListener("touchend", (e) => {
+    let found = false;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].identifier === touchId) {
+        found = true;
+        break;
+      }
+    }
+    if (found) return;
+
+    // Check for tap
+    const touch = e.changedTouches[0];
+    const dx = Math.abs(touch.clientX - tapStartX);
+    const dy = Math.abs(touch.clientY - tapStartY);
+    const timeDiff = Date.now() - tapStartTime;
+
+    if (timeDiff < 300 && dx + dy < 15 && !movedDuringDrag) {
+      const item = hitTest(touch.clientX, touch.clientY);
+      if (item) {
+        openModal(item);
+      }
+    }
+
+    touchId = null;
+    dragging = false;
+    movedDuringDrag = false;
+  }, { passive: true });
+
+  canvas.addEventListener("touchcancel", () => {
+    touchId = null;
+    dragging = false;
+    velocityX = 0;
+    velocityY = 0;
+  }, { passive: true });
+
+  // Mouse events (desktop)
+  canvas.addEventListener("mousedown", (e) => {
+    dragging = true;
+    movedDuringDrag = false;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    tapStartX = e.clientX;
+    tapStartY = e.clientY;
+    tapStartTime = Date.now();
+    velocityX = 0;
+    velocityY = 0;
+    lastMoveTime = Date.now();
+    canvas.style.cursor = "grabbing";
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    // Update cursor based on hover
+    if (!dragging) {
+      const item = hitTest(e.clientX, e.clientY);
+      canvas.style.cursor = item ? "pointer" : "grab";
+      return;
+    }
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    const now = Date.now();
+    const dt = now - lastMoveTime;
+
+    if (Math.abs(dx) + Math.abs(dy) > 3) {
+      movedDuringDrag = true;
+    }
+
+    camX -= dx;
+    camY -= dy;
+    targetCamX = camX;
+    targetCamY = camY;
+
+    if (dt > 0) {
+      velocityX = -dx * (16 / dt);
+      velocityY = -dy * (16 / dt);
+    }
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastMoveTime = now;
+  });
+
+  canvas.addEventListener("mouseup", (e) => {
+    if (!dragging) return;
+
+    const dx = Math.abs(e.clientX - tapStartX);
+    const dy = Math.abs(e.clientY - tapStartY);
+    const timeDiff = Date.now() - tapStartTime;
+
+    if (timeDiff < 300 && dx + dy < 10 && !movedDuringDrag) {
+      const item = hitTest(e.clientX, e.clientY);
+      if (item) {
+        openModal(item);
+      }
+    }
+
+    dragging = false;
+    movedDuringDrag = false;
+    canvas.style.cursor = "grab";
+  });
+
+  canvas.addEventListener("mouseleave", () => {
+    if (dragging) {
+      dragging = false;
+      canvas.style.cursor = "grab";
+    }
+  });
+
+  // Mouse wheel
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const deltaX = e.deltaX !== 0 ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+    const deltaY = e.deltaY !== 0 && !e.shiftKey ? e.deltaY : 0;
+    targetCamX += deltaX * 1.2;
+    targetCamY += deltaY * 1.2;
+  }, { passive: false });
+
+  // Instruction element
+  const instructionEl = document.createElement("div");
+  instructionEl.className = "instruction";
+  instructionEl.textContent = "Drag to explore • Tap bag for details";
+  document.body.appendChild(instructionEl);
+
+  // Modal
   const overlay = document.createElement("div");
   overlay.className = "overlay";
   overlay.innerHTML = `
@@ -1176,7 +605,6 @@ async function main() {
           <h1 id="mTitle"></h1>
           <button class="closeBtn" id="mClose">×</button>
         </div>
-
         <div class="recipeContent" id="mRecipe">
           <div class="loading">Loading recipe...</div>
         </div>
@@ -1190,32 +618,25 @@ async function main() {
   const mRecipe = overlay.querySelector("#mRecipe");
   const mClose = overlay.querySelector("#mClose");
 
-  // Convert meta fields (Type, Brewer, Grinder, Rating) to pill elements
+  // Convert meta fields to pills
   function convertMetaFieldsToPills(container) {
     const fields = ["Tags", "Brewer", "Grinder", "Rating"];
     
-    // Find all paragraphs that match our meta fields
     const paragraphs = container.querySelectorAll("p");
     paragraphs.forEach((p) => {
       const text = p.textContent.trim();
       
-      // Remove Number field entirely
       if (text.startsWith("Number: ")) {
         p.remove();
         return;
       }
       
-      // Check each field
       for (const field of fields) {
         const prefix = `${field}: `;
         if (text.startsWith(prefix)) {
-          // Extract value (everything after the prefix)
           const valueText = text.substring(prefix.length).trim();
-          
-          // Determine display label (change Tags to Type)
           const displayLabel = field === "Tags" ? "Type: " : prefix;
           
-          // For Rating, treat as single pill (stars)
           if (field === "Rating") {
             const wrapper = document.createElement("div");
             wrapper.className = "tagsWrapper";
@@ -1231,11 +652,7 @@ async function main() {
             
             p.replaceWith(wrapper);
           } else {
-            // For Tags, Brewer, Grinder - split by comma if multiple values
-            const values = valueText
-              .split(",")
-              .map(val => val.trim())
-              .filter(val => val.length > 0);
+            const values = valueText.split(",").map(val => val.trim()).filter(val => val.length > 0);
             
             if (values.length > 0) {
               const wrapper = document.createElement("div");
@@ -1248,7 +665,6 @@ async function main() {
               const pillRow = document.createElement("span");
               pillRow.className = "pillRow";
               
-              // Create a pill for each value
               values.forEach((value) => {
                 const pill = document.createElement("span");
                 pill.className = "pill";
@@ -1257,12 +673,10 @@ async function main() {
               });
               
               wrapper.appendChild(pillRow);
-              
-              // Replace the paragraph with the wrapper
               p.replaceWith(wrapper);
             }
           }
-          break; // Found a match, no need to check other fields
+          break;
         }
       }
     });
@@ -1270,51 +684,36 @@ async function main() {
     // Convert Tasting Notes section to pills
     const headings = container.querySelectorAll("h3");
     headings.forEach((h3) => {
-      // Case-insensitive match for "Tasting Notes" or "Tasting notes"
       if (h3.textContent.trim().toLowerCase() === "tasting notes") {
-        // Find the next sibling ul element, skipping over empty paragraphs and whitespace
         let nextSibling = h3.nextElementSibling;
         while (nextSibling) {
-          // Skip empty paragraphs
           if (nextSibling.tagName === "P" && nextSibling.textContent.trim() === "") {
             nextSibling = nextSibling.nextElementSibling;
             continue;
           }
-          // Found a ul - use it
-          if (nextSibling.tagName === "UL") {
-            break;
-          }
-          // If we hit another heading or non-list element before finding ul, stop searching
-          if (nextSibling.tagName === "H1" || nextSibling.tagName === "H2" || nextSibling.tagName === "H3" || nextSibling.tagName === "H4") {
+          if (nextSibling.tagName === "UL") break;
+          if (["H1", "H2", "H3", "H4"].includes(nextSibling.tagName)) {
             nextSibling = null;
             break;
           }
-          // Otherwise continue searching
           nextSibling = nextSibling.nextElementSibling;
         }
         
         if (nextSibling && nextSibling.tagName === "UL") {
-          // Get all list items (including nested ones)
           const listItems = nextSibling.querySelectorAll("li");
-          const notes = Array.from(listItems)
-            .map(li => li.textContent.trim())
-            .filter(text => text.length > 0);
+          const notes = Array.from(listItems).map(li => li.textContent.trim()).filter(text => text.length > 0);
           
           if (notes.length > 0) {
-            // Create wrapper
             const wrapper = document.createElement("div");
             wrapper.className = "tagsWrapper";
             
-            // Keep the heading but style it inline
             const label = document.createElement("span");
             label.textContent = "Tasting Notes: ";
             wrapper.appendChild(label);
             
-            // Create pill row
             const pillRow = document.createElement("span");
             pillRow.className = "pillRow";
             
-            // Create a pill for each note
             notes.forEach((note) => {
               const pill = document.createElement("span");
               pill.className = "pill";
@@ -1324,7 +723,6 @@ async function main() {
             
             wrapper.appendChild(pillRow);
             
-            // Remove empty paragraphs between h3 and ul
             let toRemove = h3.nextElementSibling;
             while (toRemove && toRemove !== nextSibling) {
               if (toRemove.tagName === "P" && toRemove.textContent.trim() === "") {
@@ -1336,7 +734,6 @@ async function main() {
               }
             }
             
-            // Replace both the heading and the ul with the wrapper
             h3.replaceWith(wrapper);
             nextSibling.remove();
           }
@@ -1344,39 +741,26 @@ async function main() {
       }
     });
     
-    // Move Notes section to the bottom and convert h3 to h2
+    // Move Notes section to bottom
     const allHeadings = Array.from(container.querySelectorAll("h2, h3"));
     allHeadings.forEach((heading) => {
-      // Case-insensitive match for "Notes"
-      if (heading.textContent.trim().toLowerCase() === "notes") {
-        // Convert h3 to h2 if needed
-        if (heading.tagName === "H3") {
-          const h2 = document.createElement("h2");
-          h2.textContent = heading.textContent;
-          heading.replaceWith(h2);
-          heading = h2;
-        }
+      const text = heading.textContent.trim().toLowerCase();
+      if (text === "notes" || text === "note") {
+        heading.outerHTML = heading.outerHTML.replace(/^<h3/, "<h2").replace(/<\/h3>$/, "</h2>");
         
-        // Collect the Notes section (heading and all following content until next major heading)
-        const notesSection = [];
-        notesSection.push(heading);
+        const updatedHeading = Array.from(container.querySelectorAll("h2")).find(
+          h => h.textContent.trim().toLowerCase() === text
+        );
         
-        let nextSibling = heading.nextElementSibling;
-        while (nextSibling) {
-          // Stop if we hit another major heading
-          if (nextSibling.tagName === "H1" || 
-              nextSibling.tagName === "H2" || 
-              (nextSibling.tagName === "H3" && nextSibling.textContent.trim().toLowerCase() !== "notes")) {
-            break;
+        if (updatedHeading) {
+          const elementsToMove = [updatedHeading];
+          let sibling = updatedHeading.nextElementSibling;
+          while (sibling && !["H1", "H2"].includes(sibling.tagName)) {
+            elementsToMove.push(sibling);
+            sibling = sibling.nextElementSibling;
           }
           
-          notesSection.push(nextSibling);
-          nextSibling = nextSibling.nextElementSibling;
-        }
-        
-        // Move all Notes section elements to the end
-        if (notesSection.length > 0) {
-          notesSection.forEach(element => {
+          elementsToMove.forEach(element => {
             container.appendChild(element);
           });
         }
@@ -1387,77 +771,55 @@ async function main() {
   async function openModal(it) {
     mImg.src = it.img;
     mImg.alt = it.name ? `${it.name} bag` : `Coffee bag ${it.number}`;
-    mTitle.textContent = ""; // Clear title initially
+    mTitle.textContent = "";
 
-    // Load markdown recipe
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
-    // Show modal immediately
     overlay.classList.add("open");
     overlay.style.display = "flex";
     overlay.style.visibility = "visible";
     overlay.style.opacity = "1";
     overlay.style.zIndex = "2000";
-    renderPaused = true; // Enhancement #4: Pause grid rendering when modal is open
+    renderPaused = true;
     
-    // Scroll modal body to top
     const modalBody = overlay.querySelector(".modalBody");
-    if (modalBody) {
-      modalBody.scrollTop = 0;
-    }
+    if (modalBody) modalBody.scrollTop = 0;
     
     try {
-      // Try to load markdown file - adjust path based on where you place your .md files
-      // Options: /recipes/coffee-01.md, /src/data/recipes/coffee-01.md, etc.
       const recipePath = `/recipes/coffee-${pad2(it.number)}.md`;
-      const response = await fetch(recipePath, {
-        cache: "default" // Allow browser caching for recipes
-      });
+      const response = await fetch(recipePath, { cache: "default" });
       
       if (response.ok) {
         const markdown = await response.text();
         const html = parseMarkdown(markdown);
         
-        // Extract H1 from the parsed HTML and move it to titleRow
         const tempDiv = document.createElement("div");
         tempDiv.innerHTML = html;
         const h1 = tempDiv.querySelector("h1");
         
         if (h1) {
-          // Set title from H1
           mTitle.textContent = h1.textContent;
-          // Remove H1 from recipe content
           h1.remove();
         }
         
-        // Convert meta fields to pills (after H1 extraction)
         convertMetaFieldsToPills(tempDiv);
-        
-        // Set the final HTML
         mRecipe.innerHTML = tempDiv.innerHTML;
       } else {
-        // Try alternative path
         const altPath = `/src/data/recipes/coffee-${pad2(it.number)}.md`;
         const altResponse = await fetch(altPath);
         if (altResponse.ok) {
           const markdown = await altResponse.text();
           const html = parseMarkdown(markdown);
           
-          // Extract H1 from the parsed HTML and move it to titleRow
           const tempDiv = document.createElement("div");
           tempDiv.innerHTML = html;
           const h1 = tempDiv.querySelector("h1");
           
           if (h1) {
-            // Set title from H1
             mTitle.textContent = h1.textContent;
-            // Remove H1 from recipe content
             h1.remove();
           }
           
-          // Convert meta fields to pills (after H1 extraction)
           convertMetaFieldsToPills(tempDiv);
-          
-          // Set the final HTML
           mRecipe.innerHTML = tempDiv.innerHTML;
         } else {
           mRecipe.innerHTML = '<div class="no-recipe">No recipe available for this coffee.</div>';
@@ -1465,7 +827,7 @@ async function main() {
       }
     } catch (error) {
       console.error("Error loading recipe:", error);
-      mRecipe.innerHTML = '<div class="no-recipe">Error loading recipe. Please check that the markdown file exists.</div>';
+      mRecipe.innerHTML = '<div class="no-recipe">Error loading recipe.</div>';
     }
   }
 
@@ -1473,7 +835,7 @@ async function main() {
     overlay.classList.remove("open");
     overlay.style.display = "none";
     overlay.style.visibility = "hidden";
-    renderPaused = false; // Enhancement #4: Resume grid rendering when modal closes
+    renderPaused = false;
   }
 
   mClose.addEventListener("click", closeModal);
@@ -1488,5 +850,5 @@ async function main() {
 main().catch((err) => {
   console.error(err);
   const app = document.querySelector("#app");
-  app.innerHTML = `<pre style="padding:24px;color:red;">${String(err)}</pre>`;
+  if (app) app.innerHTML = `<pre style="padding:24px;color:red;">${String(err)}</pre>`;
 });
