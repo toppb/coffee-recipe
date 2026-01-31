@@ -216,42 +216,95 @@ async function main() {
     
     // Start columns at 0
     const colHeights = Array(COLS).fill(0);
+    // Track last bag number in each column to prevent consecutive duplicates
+    const lastBagInCol = Array(COLS).fill(-1);
+    // Track items placed for horizontal adjacency checking
+    const placedItems = [];
 
     const tileItems = [];
 
     duplicatedItems.forEach((item) => {
-      // Find shortest column
-      let minCol = 0;
-      let minH = colHeights[0];
-      for (let c = 1; c < COLS; c++) {
-        if (colHeights[c] < minH) {
-          minH = colHeights[c];
-          minCol = c;
-        }
-      }
-
-      // Get actual image dimensions - scale to fit column while preserving aspect ratio
+      // Get dimensions first to know item height
       const dims = imageDimensions.get(item.number);
       if (!dims) return;
       
-      // Scale image to fit column width
       const scale = colWidth / dims.width;
       const w = colWidth;
       const h = dims.height * scale;
       
-      const x = sidePadding + minCol * (colWidth + GUTTER);
-      const y = colHeights[minCol];
+      // Find best column: shortest that doesn't have same bag as last item
+      // and doesn't have same bag at similar Y in adjacent columns
+      let bestCol = -1;
+      let bestHeight = Infinity;
+      
+      for (let c = 0; c < COLS; c++) {
+        // Skip if same bag was just placed in this column
+        if (lastBagInCol[c] === item.number) continue;
+        
+        // Check adjacent columns for same bag at similar Y position
+        const y = colHeights[c];
+        let hasAdjacentDupe = false;
+        
+        // Check left neighbor
+        if (c > 0) {
+          const leftItems = placedItems.filter(p => p.col === c - 1);
+          for (const p of leftItems) {
+            // Check if Y positions overlap
+            if (p.number === item.number && 
+                Math.abs(p.y - y) < Math.max(p.height, h) * 1.5) {
+              hasAdjacentDupe = true;
+              break;
+            }
+          }
+        }
+        
+        // Check right neighbor
+        if (!hasAdjacentDupe && c < COLS - 1) {
+          const rightItems = placedItems.filter(p => p.col === c + 1);
+          for (const p of rightItems) {
+            if (p.number === item.number && 
+                Math.abs(p.y - y) < Math.max(p.height, h) * 1.5) {
+              hasAdjacentDupe = true;
+              break;
+            }
+          }
+        }
+        
+        if (hasAdjacentDupe) continue;
+        
+        // This column is valid, check if it's the shortest
+        if (colHeights[c] < bestHeight) {
+          bestHeight = colHeights[c];
+          bestCol = c;
+        }
+      }
+      
+      // Fallback: if no valid column found, use shortest column anyway
+      if (bestCol === -1) {
+        bestCol = 0;
+        for (let c = 1; c < COLS; c++) {
+          if (colHeights[c] < colHeights[bestCol]) {
+            bestCol = c;
+          }
+        }
+      }
+      
+      const x = sidePadding + bestCol * (colWidth + GUTTER);
+      const y = colHeights[bestCol];
 
-      tileItems.push({
+      const placedItem = {
         ...item,
         x,
         y,
         width: w,
         height: h,
-        col: minCol,
-      });
-
-      colHeights[minCol] += h + GUTTER;
+        col: bestCol,
+      };
+      
+      tileItems.push(placedItem);
+      placedItems.push(placedItem);
+      lastBagInCol[bestCol] = item.number;
+      colHeights[bestCol] += h + GUTTER;
     });
 
     // Store where each column ends
