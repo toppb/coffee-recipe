@@ -267,9 +267,14 @@ async function main() {
 
   const tileItems = createTileLayout();
 
-  // Center camera on first tile
-  camX = (TILE_WIDTH - canvasWidth) / 2;
-  camY = 200;
+  // Center camera on a featured bag (first bag in middle column)
+  // Find a bag roughly in the center of the layout
+  const middleCol = Math.floor(COLS / 2);
+  const centerBag = tileItems.find(item => item.col === middleCol) || tileItems[0];
+  
+  // Position camera so this bag is centered on screen
+  camX = centerBag.x + centerBag.width / 2 - canvasWidth / 2;
+  camY = centerBag.y + centerBag.height / 2 - canvasHeight / 2;
   targetCamX = camX;
   targetCamY = camY;
 
