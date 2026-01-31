@@ -203,8 +203,9 @@ async function main() {
 
   // Duplicate items to fill the view better (create variations)
   const duplicatedItems = [];
-  // Reduce duplicates on mobile for better performance (fewer DOM elements)
-  const duplicateCount = isMobile ? 2 : 3;
+  // Drastically reduce duplicates on mobile for better performance (fewer DOM elements)
+  // Mobile: 1 duplicate = 20 bags per tile (vs 60 on desktop)
+  const duplicateCount = isMobile ? 1 : 3;
   for (let i = 0; i < duplicateCount; i++) {
     baseItems.forEach((item) => {
       duplicatedItems.push({
@@ -545,6 +546,12 @@ async function main() {
   targetCamX = camX;
   targetCamY = camY;
   
+  // Mobile: Set initial stage transform
+  if (isMobile) {
+    stage.style.transformOrigin = "0 0";
+    stage.style.transform = `translate3d(${-camX}px, ${-camY}px, 0)`;
+  }
+  
   // Initialize camera change tracking after camera is set
   lastCamX = camX;
   lastCamY = camY;
@@ -674,11 +681,26 @@ async function main() {
     }, 100);
   }, { passive: true });
 
+  // Mobile: Throttle render loop to reduce CPU usage
+  let mobileFrameCount = 0;
+  const MOBILE_FRAME_SKIP = 2; // Only render every 2nd frame on mobile during drag
+
   function render() {
     // Enhancement #4: Skip rendering when modal is open for better scroll performance
     if (renderPaused) {
       requestAnimationFrame(render);
       return;
+    }
+    
+    // Mobile: Throttle rendering during drag to reduce CPU load
+    if (isMobile && dragging) {
+      mobileFrameCount++;
+      if (mobileFrameCount % MOBILE_FRAME_SKIP !== 0) {
+        requestAnimationFrame(render);
+        return;
+      }
+    } else {
+      mobileFrameCount = 0;
     }
     
     // Mobile: Skip expensive clone creation/removal during drag for better performance
@@ -701,8 +723,8 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Aggressively reduce render radius on mobile Safari for better performance
-    // Fewer tiles = fewer DOM elements = less memory pressure
+    // Drastically reduce render radius on mobile for better performance
+    // Mobile: radius 1 = ~12 tiles (vs ~28 on desktop)
     const renderRadius = isMobile ? 1 : 3;
     const tilesToRender = [];
     
@@ -743,14 +765,39 @@ async function main() {
       });
       
       // Remove clones from tiles that are being removed
-      // Note: When container is removed, all its children (bags) are automatically removed
+      // Desktop: Clones are removed with container
+      // Mobile: Clones must be removed individually (not in containers)
       activeClones.forEach((clone, index) => {
-        const tileKey = `${clone.tileX}_${clone.tileY}`;
-        if (tilesToRemove.includes(tileKey)) {
-          // Don't manually remove el - it will be removed with container
-          const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
-          cloneMap.delete(key);
-          clonesToRemove.push(index);
+        if (isMobile) {
+          // Mobile: Check if clone is out of view
+          const worldX = clone.item.x + clone.tileX * TILE_WIDTH;
+          const worldY = clone.item.y + clone.tileY * TILE_HEIGHT;
+          const screenX = worldX - camX;
+          const screenY = worldY - camY;
+          
+          if (
+            screenX < -buffer ||
+            screenY < -buffer ||
+            screenX > vw + buffer ||
+            screenY > vh + buffer
+          ) {
+            // Mobile: Remove element manually
+            if (clone.el.parentNode) {
+              clone.el.remove();
+            }
+            const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
+            cloneMap.delete(key);
+            clonesToRemove.push(index);
+          }
+        } else {
+          // Desktop: Check by tile
+          const tileKey = `${clone.tileX}_${clone.tileY}`;
+          if (tilesToRemove.includes(tileKey)) {
+            // Don't manually remove el - it will be removed with container
+            const key = `${clone.item.number}_${clone.item._duplicateId || 0}_${clone.tileX}_${clone.tileY}`;
+            cloneMap.delete(key);
+            clonesToRemove.push(index);
+          }
         }
       });
 
@@ -759,14 +806,16 @@ async function main() {
         activeClones.splice(clonesToRemove[i], 1);
       }
       
-      // Remove tile containers
-      tilesToRemove.forEach(tileKey => {
-        const tileContainer = tileContainers.get(tileKey);
-        if (tileContainer && tileContainer.container.parentNode) {
-          tileContainer.container.remove();
-        }
-        tileContainers.delete(tileKey);
-      });
+      // Remove tile containers (desktop only)
+      if (!isMobile) {
+        tilesToRemove.forEach(tileKey => {
+          const tileContainer = tileContainers.get(tileKey);
+          if (tileContainer && tileContainer.container.parentNode) {
+            tileContainer.container.remove();
+          }
+          tileContainers.delete(tileKey);
+        });
+      }
 
       // Create new clones for visible tiles
       // Enhancement #5: Use DocumentFragment for batch DOM operations to reduce reflows
@@ -774,39 +823,40 @@ async function main() {
       const clonesToAdd = [];
       
       tilesToRender.forEach(({ tx, ty }) => {
-        // Get or create tile container
         const tileKey = `${tx}_${ty}`;
-        let tileContainer = tileContainers.get(tileKey);
+        let tileContainer = null;
         
-        if (!tileContainer) {
-          // Create new tile container
-          const container = document.createElement("div");
-          container.className = "tile-container";
-          container.style.position = "absolute";
-          container.style.left = "0";
-          container.style.top = "0";
-          container.style.width = `${TILE_WIDTH}px`;
-          container.style.height = `${TILE_HEIGHT}px`;
-          container.style.transformOrigin = "0 0";
+        // Desktop: Use tile containers; Mobile: Skip containers entirely
+        if (!isMobile) {
+          tileContainer = tileContainers.get(tileKey);
           
-          // Set initial transform position
-          const worldX = tx * TILE_WIDTH;
-          const worldY = ty * TILE_HEIGHT;
-          const screenX = worldX - camX;
-          const screenY = worldY - camY;
-          container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-          
-          fragment.appendChild(container);
-          
-          tileContainer = {
-            container,
-            tileX: tx,
-            tileY: ty,
-          };
-          // Store tile coordinates on container for cleanup (dataset values must be strings)
-          container.dataset.tileX = String(tx);
-          container.dataset.tileY = String(ty);
-          tileContainers.set(tileKey, tileContainer);
+          if (!tileContainer) {
+            // Create new tile container
+            const container = document.createElement("div");
+            container.className = "tile-container";
+            container.style.position = "absolute";
+            container.style.left = "0";
+            container.style.top = "0";
+            container.style.width = `${TILE_WIDTH}px`;
+            container.style.height = `${TILE_HEIGHT}px`;
+            container.style.transformOrigin = "0 0";
+            
+            // Set initial transform position
+            const worldX = tx * TILE_WIDTH;
+            const worldY = ty * TILE_HEIGHT;
+            const screenX = worldX - camX;
+            const screenY = worldY - camY;
+            container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+            
+            fragment.appendChild(container);
+            
+            tileContainer = {
+              container,
+              tileX: tx,
+              tileY: ty,
+            };
+            tileContainers.set(tileKey, tileContainer);
+          }
         }
         
         tileItems.forEach((item) => {
@@ -815,15 +865,28 @@ async function main() {
           const existing = cloneMap.get(key);
 
           if (!existing) {
-            // Create new clone - positioned relative to tile container
+            // Create new clone
             const el = createItemElement(item);
             el.style.position = "absolute";
-            el.style.left = `${item.x}px`;
-            el.style.top = `${item.y}px`;
-            el.style.transform = "translateZ(0)"; // Keep GPU acceleration, no position transform
-            el.style.willChange = "transform";
-            // Cursor is already set by setupBagCursor in createItemElement
-            tileContainer.container.appendChild(el);
+            
+            if (isMobile) {
+              // Mobile: Use world coordinates (stage is transformed)
+              const worldX = item.x + tx * TILE_WIDTH;
+              const worldY = item.y + ty * TILE_HEIGHT;
+              el.style.left = `${worldX}px`;
+              el.style.top = `${worldY}px`;
+              // No GPU hints on mobile - they cause performance issues
+              // Append directly to fragment (will go to stage)
+              fragment.appendChild(el);
+            } else {
+              // Desktop: Position relative to tile container
+              el.style.left = `${item.x}px`;
+              el.style.top = `${item.y}px`;
+              el.style.transform = "translateZ(0)"; // GPU acceleration
+              el.style.willChange = "transform";
+              // Append to container
+              tileContainer.container.appendChild(el);
+            }
 
             const clone = {
               item,
@@ -862,10 +925,14 @@ async function main() {
       }
     }
 
-    // Container-based transforms: Update tile container positions instead of individual bags
-    // This dramatically reduces the number of DOM updates (from 100+ to ~10-20)
-    // Mobile Safari: Skip updates during drag to prevent performance degradation
-    if (!isMobile || !dragging) {
+    // Mobile: Use single stage transform (1 DOM update) instead of container transforms
+    // Desktop: Use container-based transforms for better precision
+    if (isMobile) {
+      // Mobile: Transform the entire stage - bags use world coordinates (left/top)
+      // This is a single DOM update vs multiple container updates
+      stage.style.transform = `translate3d(${-camX}px, ${-camY}px, 0)`;
+    } else {
+      // Desktop: Container-based transforms for each tile
       tileContainers.forEach((tileContainer) => {
         const worldX = tileContainer.tileX * TILE_WIDTH;
         const worldY = tileContainer.tileY * TILE_HEIGHT;

@@ -28,12 +28,12 @@ body{
 }
 @media (max-width: 760px){
   #stage{
-    /* Mobile Safari: Remove containment - causes performance issues */
-    contain: none;
-    /* Only use will-change during drag */
+    /* Mobile: Simplified - stage transforms, remove GPU hints that cause issues */
+    transform-origin: 0 0;
+    transform: none; /* Will be set by JS */
+    -webkit-transform: none;
+    contain: none; /* Remove containment on mobile */
     will-change: auto;
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
   }
 }
 
@@ -57,16 +57,8 @@ body{
 }
 @media (max-width: 760px){
   .tile-container{
-    /* Mobile Safari: Remove containment and will-change - causes memory/compositing issues */
-    contain: none;
-    will-change: auto;
-    /* Only minimal GPU acceleration */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-  }
-  #stage.dragging .tile-container{
-    /* Only use will-change during active drag on mobile */
-    will-change: transform;
+    /* Mobile: Hide containers - we append bags directly to stage */
+    display: none;
   }
 }
 
@@ -92,12 +84,12 @@ button.bag{
   #stage .bag,
   #stage button.bag,
   button.bag{
-    /* Reduce will-change on mobile to avoid performance issues */
-    will-change: auto;
-  }
-  #stage.dragging .bag{
-    /* Only use will-change during drag on mobile */
-    will-change: transform;
+    /* Mobile: Remove all GPU hints - they overwhelm mobile Safari */
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+    backface-visibility: visible;
+    contain: none;
   }
 }
 .bag:hover,
