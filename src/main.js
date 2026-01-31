@@ -559,11 +559,11 @@ async function main() {
   // Create DOM elements for items (we'll duplicate these)
   const itemElements = new Map(); // Map from item number to element
 
-  // Helper function to ensure cursor is set on bag elements
+  // Helper function to ensure cursor is set on bag elements (desktop only)
   function setupBagCursor(bagEl) {
     // Set cursor inline - this has high priority
     bagEl.style.cursor = "pointer";
-    // Use mouseenter/mouseleave to track hover state
+    // Use mouseenter/mouseleave to track hover state (not needed on mobile)
     bagEl.addEventListener("mouseenter", () => {
       bagEl.style.cursor = "pointer";
       bagHoverCount++;
@@ -584,28 +584,9 @@ async function main() {
       // Clone the element
       el = itemElements.get(key).cloneNode(true);
       // Ensure cursor is set on cloned elements
-      setupBagCursor(el);
-      // Re-attach event listener (cloneNode doesn't copy event listeners)
-      // Use pointer events for better mobile support
-      el.addEventListener("pointerdown", (e) => {
-        bagTapStartX = e.clientX;
-        bagTapStartY = e.clientY;
-        bagTapStartTime = Date.now();
-      }, { passive: true });
-      
-      el.addEventListener("pointerup", (e) => {
-        e.stopPropagation();
-        const dx = Math.abs(e.clientX - bagTapStartX);
-        const dy = Math.abs(e.clientY - bagTapStartY);
-        const timeDiff = Date.now() - bagTapStartTime;
-        const distance = dx + dy;
-        
-        // If tap was quick (< 300ms) and movement was small (< 10px), treat as click
-        if (timeDiff < 300 && distance < 10 && !dragging) {
-          e.preventDefault();
-          openModal(item);
-        }
-      }, { passive: false });
+      if (!isMobile) setupBagCursor(el);
+      // Store item data on element for event delegation
+      el.dataset.itemNumber = item.number;
       return el;
     }
 
@@ -613,6 +594,8 @@ async function main() {
     el.className = "bag";
     el.type = "button";
     el.setAttribute("aria-label", item.name || `Coffee ${item.number}`);
+    // Store item data on element for event delegation
+    el.dataset.itemNumber = item.number;
 
     const img = document.createElement("img");
     img.src = item.img;
@@ -620,37 +603,86 @@ async function main() {
     img.style.width = `${item.width}px`;
     img.style.height = `${item.height}px`;
     // Enhancement #2: Image loading optimizations
-    img.loading = "lazy"; // Lazy load images that aren't immediately visible
-    img.decoding = "async"; // Decode images asynchronously
-    img.fetchPriority = item.number <= 3 ? "high" : "low"; // Prioritize first few images
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.fetchPriority = item.number <= 3 ? "high" : "low";
     img.style.objectFit = "contain";
 
     el.appendChild(img);
-    setupBagCursor(el);
-    
-    // Use pointer events for better mobile support
-    el.addEventListener("pointerdown", (e) => {
-      bagTapStartX = e.clientX;
-      bagTapStartY = e.clientY;
-      bagTapStartTime = Date.now();
+    if (!isMobile) setupBagCursor(el);
+
+    itemElements.set(key, el);
+    return el;
+  }
+  
+  // Event delegation for bag clicks - single listener instead of one per bag
+  // This dramatically reduces memory usage and improves touch response
+  let bagTapTarget = null;
+  
+  if (isMobile) {
+    // Mobile: Use touch events for bag taps
+    stage.addEventListener("touchstart", (e) => {
+      const target = e.target.closest('.bag');
+      if (target) {
+        const touch = e.touches[0];
+        bagTapStartX = touch.clientX;
+        bagTapStartY = touch.clientY;
+        bagTapStartTime = Date.now();
+        bagTapTarget = target;
+      }
     }, { passive: true });
     
-    el.addEventListener("pointerup", (e) => {
-      e.stopPropagation();
+    stage.addEventListener("touchend", (e) => {
+      if (!bagTapTarget) return;
+      
+      const touch = e.changedTouches[0];
+      const dx = Math.abs(touch.clientX - bagTapStartX);
+      const dy = Math.abs(touch.clientY - bagTapStartY);
+      const timeDiff = Date.now() - bagTapStartTime;
+      const distance = dx + dy;
+      
+      // Quick tap with minimal movement = click
+      if (timeDiff < 300 && distance < 15 && !movedDuringDrag) {
+        const itemNumber = parseInt(bagTapTarget.dataset.itemNumber, 10);
+        // Use baseItems which has the img field (data doesn't have it)
+        const item = baseItems.find(d => d.number === itemNumber);
+        if (item) {
+          openModal(item);
+        }
+      }
+      bagTapTarget = null;
+    }, { passive: true });
+  } else {
+    // Desktop: Use pointer events for bag clicks
+    stage.addEventListener("pointerdown", (e) => {
+      const target = e.target.closest('.bag');
+      if (target) {
+        bagTapStartX = e.clientX;
+        bagTapStartY = e.clientY;
+        bagTapStartTime = Date.now();
+        bagTapTarget = target;
+      }
+    }, { passive: true, capture: true });
+    
+    stage.addEventListener("pointerup", (e) => {
+      if (!bagTapTarget) return;
+      
       const dx = Math.abs(e.clientX - bagTapStartX);
       const dy = Math.abs(e.clientY - bagTapStartY);
       const timeDiff = Date.now() - bagTapStartTime;
       const distance = dx + dy;
       
-      // If tap was quick (< 300ms) and movement was small (< 10px), treat as click
-      if (timeDiff < 300 && distance < 10 && !dragging) {
-        e.preventDefault();
-        openModal(item);
+      // Quick tap with minimal movement = click
+      if (timeDiff < 300 && distance < 10 && !dragging && !movedDuringDrag) {
+        const itemNumber = parseInt(bagTapTarget.dataset.itemNumber, 10);
+        // Use baseItems which has the img field (data doesn't have it)
+        const item = baseItems.find(d => d.number === itemNumber);
+        if (item) {
+          openModal(item);
+        }
       }
-    }, { passive: false });
-
-    itemElements.set(key, el);
-    return el;
+      bagTapTarget = null;
+    }, { passive: true, capture: true });
   }
 
   // Active clones (visible items) - use Map for faster lookups
@@ -984,86 +1016,140 @@ async function main() {
     }
   }, { passive: true });
 
-  // Drag handlers
-  stage.addEventListener("pointerdown", (e) => {
-    // Don't start dragging if clicking on a bag button - let bag handle it
-    if (e.target.closest('.bag')) {
-      return;
-    }
+  // Drag handlers - use native touch events on mobile for better performance
+  if (isMobile) {
+    // Mobile: Native touch events are faster than pointer events
+    let touchId = null;
     
-    // Prevent default immediately for faster touch response
-    e.preventDefault();
-    
-    dragging = true;
-    movedDuringDrag = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    // Sync target with current position when starting drag
-    targetCamX = camX;
-    targetCamY = camY;
-    stage.classList.add("dragging");
-    stage.setPointerCapture(e.pointerId);
-  }, { passive: false });
+    stage.addEventListener("touchstart", (e) => {
+      // Only track first touch
+      if (touchId !== null) return;
+      
+      const touch = e.touches[0];
+      
+      // Check if touching a bag - use simple tag check (faster than closest)
+      const target = e.target;
+      if (target.tagName === 'BUTTON' || target.tagName === 'IMG') {
+        return;
+      }
+      
+      touchId = touch.identifier;
+      dragging = true;
+      movedDuringDrag = false;
+      dragStartX = touch.clientX;
+      dragStartY = touch.clientY;
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      targetCamX = camX;
+      targetCamY = camY;
+      // Skip classList change on touchstart - it causes style recalc
+    }, { passive: true });
 
-  stage.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    
-    // Prevent default to ensure smooth dragging on mobile
-    e.preventDefault();
+    stage.addEventListener("touchmove", (e) => {
+      if (touchId === null) return;
+      
+      // Find our tracked touch
+      let touch = null;
+      for (let i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === touchId) {
+          touch = e.touches[i];
+          break;
+        }
+      }
+      if (!touch) return;
+      
+      e.preventDefault(); // Prevent scrolling
 
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
+      const dx = touch.clientX - lastX;
+      const dy = touch.clientY - lastY;
 
-    // Only mark as moved if movement is significant (more than 3px for faster response)
-    // Reduced threshold for faster drag detection
-    if (Math.abs(dx) + Math.abs(dy) > 3) {
-      movedDuringDrag = true;
-    }
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        movedDuringDrag = true;
+      }
 
-    // Update camera position directly during drag for instant response (no interpolation lag)
-    camX -= dx;
-    camY -= dy;
-    // Also update target to keep them in sync
-    targetCamX = camX;
-    targetCamY = camY;
+      // Update camera directly
+      camX -= dx;
+      camY -= dy;
+      targetCamX = camX;
+      targetCamY = camY;
 
-    lastX = e.clientX;
-    lastY = e.clientY;
-    
-    // Don't update positions here - let the render loop handle it to avoid overheating
-    // The render loop will update positions on the next frame
-  }, { passive: false });
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+    }, { passive: false });
 
-  stage.addEventListener("pointerup", (e) => {
-    dragging = false;
-    stage.classList.remove("dragging");
-    stage.releasePointerCapture(e.pointerId);
-    updateStageCursor(); // Update cursor state after drag ends
-    lastDragEndTime = Date.now(); // Track when drag ended
-    
-    // Mobile Safari: Aggressive cleanup after drag to prevent memory accumulation
-    if (isMobile) {
-      // Force a render to update container positions that were skipped during drag
-      requestAnimationFrame(() => {
-        // Clean up any orphaned containers by checking against tileContainers map
-        const allContainers = Array.from(stage.querySelectorAll('.tile-container'));
-        allContainers.forEach(container => {
-          const tileX = container.dataset.tileX;
-          const tileY = container.dataset.tileY;
-          if (tileX && tileY) {
-            const tileKey = `${tileX}_${tileY}`;
-            if (!tileContainers.has(tileKey)) {
-              container.remove();
-            }
-          }
-        });
-      });
-    }
-    
-    setTimeout(() => (movedDuringDrag = false), 100);
-  }, { passive: true });
+    stage.addEventListener("touchend", (e) => {
+      // Check if our tracked touch ended
+      let found = false;
+      for (let i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === touchId) {
+          found = true;
+          break;
+        }
+      }
+      if (found) return; // Our touch is still active
+      
+      touchId = null;
+      dragging = false;
+      lastDragEndTime = Date.now();
+      setTimeout(() => (movedDuringDrag = false), 100);
+    }, { passive: true });
+
+    stage.addEventListener("touchcancel", () => {
+      touchId = null;
+      dragging = false;
+    }, { passive: true });
+  } else {
+    // Desktop: Use pointer events
+    stage.addEventListener("pointerdown", (e) => {
+      // Don't start dragging if clicking on a bag button - let bag handle it
+      if (e.target.closest('.bag')) {
+        return;
+      }
+      
+      e.preventDefault();
+      
+      dragging = true;
+      movedDuringDrag = false;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      targetCamX = camX;
+      targetCamY = camY;
+      stage.classList.add("dragging");
+      stage.setPointerCapture(e.pointerId);
+    }, { passive: false });
+
+    stage.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      
+      e.preventDefault();
+
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        movedDuringDrag = true;
+      }
+
+      camX -= dx;
+      camY -= dy;
+      targetCamX = camX;
+      targetCamY = camY;
+
+      lastX = e.clientX;
+      lastY = e.clientY;
+    }, { passive: false });
+
+    stage.addEventListener("pointerup", (e) => {
+      dragging = false;
+      stage.classList.remove("dragging");
+      stage.releasePointerCapture(e.pointerId);
+      updateStageCursor();
+      lastDragEndTime = Date.now();
+      setTimeout(() => (movedDuringDrag = false), 100);
+    }, { passive: true });
+  }
 
   // Scroll wheel navigation
   stage.addEventListener("wheel", (e) => {

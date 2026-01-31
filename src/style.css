@@ -120,9 +120,22 @@ button.bag:focus{
   /* Enhancement #7: Content visibility optimization */
   content-visibility: auto; /* Browser can skip rendering when off-screen */
 }
+@media (max-width: 760px){
+  .bag img{
+    /* Mobile: Remove all transitions and hover effects for better performance */
+    transition: none !important;
+    content-visibility: visible; /* Don't use auto on mobile - causes jank */
+  }
+}
 
 .bag:hover img{
   transform: translateY(-2px) scale(1.03);
+}
+@media (max-width: 760px){
+  .bag:hover img{
+    /* Mobile: Disable hover transform */
+    transform: none;
+  }
 }
 
 /* Modal */
