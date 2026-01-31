@@ -28,8 +28,10 @@ body{
 }
 @media (max-width: 760px){
   #stage{
-    /* Additional mobile optimizations */
-    will-change: transform;
+    /* Mobile Safari: Remove containment - causes performance issues */
+    contain: none;
+    /* Only use will-change during drag */
+    will-change: auto;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
@@ -55,11 +57,15 @@ body{
 }
 @media (max-width: 760px){
   .tile-container{
-    /* Remove containment on mobile - it can cause performance issues */
+    /* Mobile Safari: Remove containment and will-change - causes memory/compositing issues */
     contain: none;
+    will-change: auto;
+    /* Only minimal GPU acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
   #stage.dragging .tile-container{
-    /* Only use will-change during drag on mobile */
+    /* Only use will-change during active drag on mobile */
     will-change: transform;
   }
 }

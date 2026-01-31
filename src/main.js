@@ -701,8 +701,9 @@ async function main() {
     lastTileY = tileY;
 
     // Render tiles in a grid around the center (larger radius to fill view)
-    // Reduce render radius on mobile for better performance (fewer tiles = fewer elements)
-    const renderRadius = isMobile ? 2 : 3;
+    // Aggressively reduce render radius on mobile Safari for better performance
+    // Fewer tiles = fewer DOM elements = less memory pressure
+    const renderRadius = isMobile ? 1 : 3;
     const tilesToRender = [];
     
     // Same render radius extension for desktop and mobile
@@ -802,6 +803,9 @@ async function main() {
             tileX: tx,
             tileY: ty,
           };
+          // Store tile coordinates on container for cleanup (dataset values must be strings)
+          container.dataset.tileX = String(tx);
+          container.dataset.tileY = String(ty);
           tileContainers.set(tileKey, tileContainer);
         }
         
@@ -860,15 +864,18 @@ async function main() {
 
     // Container-based transforms: Update tile container positions instead of individual bags
     // This dramatically reduces the number of DOM updates (from 100+ to ~10-20)
-    tileContainers.forEach((tileContainer) => {
-      const worldX = tileContainer.tileX * TILE_WIDTH;
-      const worldY = tileContainer.tileY * TILE_HEIGHT;
-      const screenX = worldX - camX;
-      const screenY = worldY - camY;
+    // Mobile Safari: Skip updates during drag to prevent performance degradation
+    if (!isMobile || !dragging) {
+      tileContainers.forEach((tileContainer) => {
+        const worldX = tileContainer.tileX * TILE_WIDTH;
+        const worldY = tileContainer.tileY * TILE_HEIGHT;
+        const screenX = worldX - camX;
+        const screenY = worldY - camY;
 
-      // Transform the container instead of individual bags
-      tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
-    });
+        // Transform the container instead of individual bags
+        tileContainer.container.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+      });
+    }
     
     // Update last camera position for tracking
     lastCamX = camX;
@@ -968,6 +975,26 @@ async function main() {
     stage.releasePointerCapture(e.pointerId);
     updateStageCursor(); // Update cursor state after drag ends
     lastDragEndTime = Date.now(); // Track when drag ended
+    
+    // Mobile Safari: Aggressive cleanup after drag to prevent memory accumulation
+    if (isMobile) {
+      // Force a render to update container positions that were skipped during drag
+      requestAnimationFrame(() => {
+        // Clean up any orphaned containers by checking against tileContainers map
+        const allContainers = Array.from(stage.querySelectorAll('.tile-container'));
+        allContainers.forEach(container => {
+          const tileX = container.dataset.tileX;
+          const tileY = container.dataset.tileY;
+          if (tileX && tileY) {
+            const tileKey = `${tileX}_${tileY}`;
+            if (!tileContainers.has(tileKey)) {
+              container.remove();
+            }
+          }
+        });
+      });
+    }
+    
     setTimeout(() => (movedDuringDrag = false), 100);
   }, { passive: true });
 
