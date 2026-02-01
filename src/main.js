@@ -153,6 +153,13 @@ async function main() {
   let velocityY = 0;
   let lastMoveTime = 0;
 
+  // Hover state for zoom effect
+  let hoveredItem = null;
+  let lastHoveredItem = null; // Keep track for smooth zoom out
+  let hoverScale = 1;
+  const HOVER_SCALE_TARGET = 1.04;
+  const HOVER_SCALE_SPEED = 0.12;
+
   // Items setup - use actual image dimensions (no resizing)
   const baseItems = data.map((d) => {
     const number = Number(d.number);
@@ -417,10 +424,39 @@ async function main() {
             
             const img = imageCache.get(item.number);
             if (img) {
-              ctx.drawImage(img, screenX, screenY, item.width, item.height);
+              // Check if this is the hovered or last-hovered item (for smooth zoom out)
+              const activeHover = hoveredItem || lastHoveredItem;
+              const isHovered = activeHover && 
+                activeHover.number === item.number && 
+                Math.abs(screenX - (activeHover.screenX || 0)) < 5 &&
+                Math.abs(screenY - (activeHover.screenY || 0)) < 5;
+              
+              if (isHovered && hoverScale > 1.001) {
+                // Draw with scale effect
+                const scale = hoverScale;
+                const scaledW = item.width * scale;
+                const scaledH = item.height * scale;
+                const offsetX = (scaledW - item.width) / 2;
+                const offsetY = (scaledH - item.height) / 2;
+                ctx.drawImage(img, screenX - offsetX, screenY - offsetY, scaledW, scaledH);
+              } else {
+                ctx.drawImage(img, screenX, screenY, item.width, item.height);
+              }
             }
           }
         });
+      }
+    }
+    
+    // Animate hover scale
+    if (hoveredItem) {
+      lastHoveredItem = hoveredItem;
+      hoverScale += (HOVER_SCALE_TARGET - hoverScale) * HOVER_SCALE_SPEED;
+    } else {
+      hoverScale += (1 - hoverScale) * HOVER_SCALE_SPEED;
+      // Clear lastHoveredItem once scale is back to normal
+      if (hoverScale < 1.001) {
+        lastHoveredItem = null;
       }
     }
 
@@ -580,12 +616,30 @@ async function main() {
   });
 
   canvas.addEventListener("mousemove", (e) => {
-    // Update cursor based on hover
+    // Update cursor and hover state
     if (!dragging) {
       const item = hitTest(e.clientX, e.clientY);
       canvas.style.cursor = item ? "pointer" : "grab";
+      
+      // Track hovered item for zoom effect
+      if (item) {
+        // Calculate screen position of hovered item
+        const colHeight = columnEndHeights[item.col];
+        const tileY = Math.floor((e.clientY + camY) / colHeight);
+        const tileX = Math.floor((e.clientX + camX) / TILE_WIDTH);
+        hoveredItem = {
+          ...item,
+          screenX: item.x + tileX * TILE_WIDTH - camX,
+          screenY: item.y + tileY * colHeight - camY
+        };
+      } else {
+        hoveredItem = null;
+      }
       return;
     }
+    
+    // Clear hover when dragging
+    hoveredItem = null;
 
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -631,6 +685,7 @@ async function main() {
   });
 
   canvas.addEventListener("mouseleave", () => {
+    hoveredItem = null;
     if (dragging) {
       dragging = false;
       canvas.style.cursor = "grab";
