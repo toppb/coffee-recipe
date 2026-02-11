@@ -801,7 +801,7 @@ async function main() {
         <circle cx="11" cy="11" r="8"></circle>
         <path d="M21 21l-4.35-4.35"></path>
       </svg>
-      <input type="text" class="search-input" placeholder="Search coffees..." />
+      <input type="text" class="search-input" placeholder="Search recipes..." />
       <button class="search-clear" style="display: none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 6L6 18M6 6l12 12"></path>
