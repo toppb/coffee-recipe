@@ -153,6 +153,19 @@ async function main() {
   let velocityY = 0;
   let lastMoveTime = 0;
 
+  // Hover state for zoom effect
+  let hoveredItem = null;
+  let lastHoveredItem = null; // Keep track for smooth zoom out
+  let hoverScale = 1;
+  const HOVER_SCALE_TARGET = 1.04;
+  const HOVER_SCALE_SPEED = 0.12;
+
+  // Search state
+  let searchQuery = "";
+  let isSearching = false;
+  let searchTransitionAlpha = 1; // For fade transition
+  let filteredBaseItems = []; // Will be set to baseItems after initialization
+
   // Items setup - use actual image dimensions (no resizing)
   const baseItems = data.map((d) => {
     const number = Number(d.number);
@@ -162,24 +175,35 @@ async function main() {
       img: imgFor(number),
     };
   });
+  
+  // Initialize filteredBaseItems with all items
+  filteredBaseItems = baseItems;
 
-  // Create duplicated items for tile
-  const duplicatedItems = [];
+  // Create duplicated items for tile (mutable for search)
+  let duplicatedItems = [];
   const duplicateCount = 3;
-  for (let i = 0; i < duplicateCount; i++) {
-    baseItems.forEach((item) => {
-      duplicatedItems.push({
-        ...item,
-        _duplicateId: i,
+  
+  function createDuplicatedItems(items) {
+    const result = [];
+    // Adjust duplicate count based on result size for better coverage
+    const count = items.length <= 2 ? 10 : items.length <= 5 ? 6 : duplicateCount;
+    for (let i = 0; i < count; i++) {
+      items.forEach((item) => {
+        result.push({
+          ...item,
+          _duplicateId: i,
+        });
       });
-    });
+    }
+    // Shuffle
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
   }
-
-  // Shuffle
-  for (let i = duplicatedItems.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [duplicatedItems[i], duplicatedItems[j]] = [duplicatedItems[j], duplicatedItems[i]];
-  }
+  
+  duplicatedItems = createDuplicatedItems(baseItems);
 
   // Preload images and get their dimensions
   const imageCache = new Map();
@@ -318,18 +342,61 @@ async function main() {
     return tileItems;
   }
 
-  const tileItems = createTileLayout();
+  let tileItems = createTileLayout();
 
   // Center camera on a featured bag (first bag in middle column)
-  // Find a bag roughly in the center of the layout
-  const middleCol = Math.floor(COLS / 2);
-  const centerBag = tileItems.find(item => item.col === middleCol) || tileItems[0];
-  
-  // Position camera so this bag is centered on screen
-  camX = centerBag.x + centerBag.width / 2 - canvasWidth / 2;
-  camY = centerBag.y + centerBag.height / 2 - canvasHeight / 2;
-  targetCamX = camX;
-  targetCamY = camY;
+  function centerOnFirstBag() {
+    const middleCol = Math.floor(COLS / 2);
+    const centerBag = tileItems.find(item => item.col === middleCol) || tileItems[0];
+    if (centerBag) {
+      camX = centerBag.x + centerBag.width / 2 - canvasWidth / 2;
+      camY = centerBag.y + centerBag.height / 2 - canvasHeight / 2;
+      targetCamX = camX;
+      targetCamY = camY;
+    }
+  }
+  centerOnFirstBag();
+
+  // Rebuild layout for search results
+  function rebuildLayoutForSearch(query) {
+    // Start transition
+    searchTransitionAlpha = 0;
+    
+    // Filter items based on search query
+    if (query.trim() === "") {
+      filteredBaseItems = baseItems;
+    } else {
+      const lowerQuery = query.toLowerCase();
+      filteredBaseItems = baseItems.filter(item => {
+        // Search in name
+        const name = (item.name || "").toLowerCase();
+        // Search in tags (array)
+        const tagsMatch = Array.isArray(item.tags) 
+          ? item.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
+          : false;
+        // Search by number
+        const numberMatch = String(item.number).includes(lowerQuery);
+        
+        return name.includes(lowerQuery) || tagsMatch || numberMatch;
+      });
+    }
+    
+    // If no results, keep showing all items but could add "no results" message
+    if (filteredBaseItems.length === 0) {
+      filteredBaseItems = baseItems;
+    }
+    
+    // Rebuild duplicated items and layout
+    duplicatedItems = createDuplicatedItems(filteredBaseItems);
+    tileItems = createTileLayout();
+    
+    // Center on first result with smooth transition
+    centerOnFirstBag();
+    
+    // Clear hover state
+    hoveredItem = null;
+    lastHoveredItem = null;
+  }
 
   // Render paused flag (for modal)
   let renderPaused = false;
@@ -416,12 +483,72 @@ async function main() {
             const screenY = worldY - camY;
             
             const img = imageCache.get(item.number);
+            
+            // Apply transition alpha for search results fade-in
+            const shouldShowPlaceholder = searchTransitionAlpha < 0.3;
+            
+            if (shouldShowPlaceholder) {
+              // Draw placeholder rectangle during transition
+              ctx.globalAlpha = 1 - searchTransitionAlpha;
+              ctx.fillStyle = "#E8E0D4";
+              ctx.beginPath();
+              ctx.roundRect(screenX, screenY, item.width, item.height, 12);
+              ctx.fill();
+              ctx.globalAlpha = 1;
+            }
+            
             if (img) {
-              ctx.drawImage(img, screenX, screenY, item.width, item.height);
+              // Check if this is the hovered or last-hovered item (for smooth zoom out)
+              const activeHover = hoveredItem || lastHoveredItem;
+              const isHovered = activeHover && 
+                activeHover.number === item.number && 
+                Math.abs(screenX - (activeHover.screenX || 0)) < 5 &&
+                Math.abs(screenY - (activeHover.screenY || 0)) < 5;
+              
+              // Apply search transition fade
+              ctx.globalAlpha = searchTransitionAlpha;
+              
+              if (isHovered && hoverScale > 1.001) {
+                // Draw with scale effect
+                const scale = hoverScale;
+                const scaledW = item.width * scale;
+                const scaledH = item.height * scale;
+                const offsetX = (scaledW - item.width) / 2;
+                const offsetY = (scaledH - item.height) / 2;
+                ctx.drawImage(img, screenX - offsetX, screenY - offsetY, scaledW, scaledH);
+              } else {
+                ctx.drawImage(img, screenX, screenY, item.width, item.height);
+              }
+              
+              ctx.globalAlpha = 1;
+            } else {
+              // Draw placeholder for unloaded images
+              ctx.fillStyle = "#E8E0D4";
+              ctx.beginPath();
+              ctx.roundRect(screenX, screenY, item.width, item.height, 12);
+              ctx.fill();
             }
           }
         });
       }
+    }
+    
+    // Animate hover scale
+    if (hoveredItem) {
+      lastHoveredItem = hoveredItem;
+      hoverScale += (HOVER_SCALE_TARGET - hoverScale) * HOVER_SCALE_SPEED;
+    } else {
+      hoverScale += (1 - hoverScale) * HOVER_SCALE_SPEED;
+      // Clear lastHoveredItem once scale is back to normal
+      if (hoverScale < 1.001) {
+        lastHoveredItem = null;
+      }
+    }
+    
+    // Animate search transition fade-in
+    if (searchTransitionAlpha < 1) {
+      searchTransitionAlpha += 0.08;
+      if (searchTransitionAlpha > 1) searchTransitionAlpha = 1;
     }
 
     requestAnimationFrame(render);
@@ -580,12 +707,30 @@ async function main() {
   });
 
   canvas.addEventListener("mousemove", (e) => {
-    // Update cursor based on hover
+    // Update cursor and hover state
     if (!dragging) {
       const item = hitTest(e.clientX, e.clientY);
       canvas.style.cursor = item ? "pointer" : "grab";
+      
+      // Track hovered item for zoom effect
+      if (item) {
+        // Calculate screen position of hovered item
+        const colHeight = columnEndHeights[item.col];
+        const tileY = Math.floor((e.clientY + camY) / colHeight);
+        const tileX = Math.floor((e.clientX + camX) / TILE_WIDTH);
+        hoveredItem = {
+          ...item,
+          screenX: item.x + tileX * TILE_WIDTH - camX,
+          screenY: item.y + tileY * colHeight - camY
+        };
+      } else {
+        hoveredItem = null;
+      }
       return;
     }
+    
+    // Clear hover when dragging
+    hoveredItem = null;
 
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -631,6 +776,7 @@ async function main() {
   });
 
   canvas.addEventListener("mouseleave", () => {
+    hoveredItem = null;
     if (dragging) {
       dragging = false;
       canvas.style.cursor = "grab";
@@ -646,11 +792,72 @@ async function main() {
     targetCamY += deltaY * 1.2;
   }, { passive: false });
 
-  // Instruction element
-  const instructionEl = document.createElement("div");
-  instructionEl.className = "instruction";
-  instructionEl.textContent = "Drag to explore • Tap bag for details";
-  document.body.appendChild(instructionEl);
+  // Search bar element
+  const searchBar = document.createElement("div");
+  searchBar.className = "search-bar";
+  searchBar.innerHTML = `
+    <div class="search-container">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="M21 21l-4.35-4.35"></path>
+      </svg>
+      <input type="text" class="search-input" placeholder="Search recipes..." />
+      <button class="search-clear" style="display: none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  `;
+  document.body.appendChild(searchBar);
+  
+  const searchInput = searchBar.querySelector(".search-input");
+  const searchClear = searchBar.querySelector(".search-clear");
+  
+  let searchTimeout = null;
+  
+  searchInput.addEventListener("input", (e) => {
+    const query = e.target.value;
+    searchClear.style.display = query.length > 0 ? "flex" : "none";
+    
+    // Debounce search
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      searchQuery = query;
+      rebuildLayoutForSearch(query);
+    }, 200);
+  });
+  
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchClear.style.display = "none";
+    searchQuery = "";
+    rebuildLayoutForSearch("");
+    searchInput.focus();
+  });
+  
+  // Prevent drag events from interfering with search
+  searchBar.addEventListener("mousedown", (e) => e.stopPropagation());
+  searchBar.addEventListener("touchstart", (e) => e.stopPropagation());
+  
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    // Focus search on "/" key
+    if (e.key === "/" && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+    // Clear search on Escape
+    if (e.key === "Escape" && document.activeElement === searchInput) {
+      searchInput.blur();
+      if (searchInput.value) {
+        searchInput.value = "";
+        searchClear.style.display = "none";
+        searchQuery = "";
+        rebuildLayoutForSearch("");
+      }
+    }
+  });
 
   // Modal
   const overlay = document.createElement("div");
