@@ -166,6 +166,10 @@ async function main() {
   let searchTransitionAlpha = 1; // For fade transition
   let filteredBaseItems = []; // Will be set to baseItems after initialization
 
+  // Filter state: { type: [], brewer: [], grinder: [], rating: [], tastingNotes: [] }
+  let activeFilters = { type: [], brewer: [], grinder: [], rating: [], tastingNotes: [] };
+  let noMatchFound = false;
+
   // Items setup - use actual image dimensions (no resizing)
   const baseItems = data.map((d) => {
     const number = Number(d.number);
@@ -175,7 +179,43 @@ async function main() {
       img: imgFor(number),
     };
   });
-  
+
+  // Fetch recipe metadata to enrich items with brewer, grinder, tasting notes
+  const recipeMetadata = new Map();
+  const recipeFetchPromises = baseItems.map(async (item) => {
+    try {
+      const res = await fetch(`/recipes/coffee-${pad2(item.number)}.md`, { cache: "default" });
+      const md = await res.text();
+      const meta = { brewer: [], grinder: [], notes: [] };
+      const lines = md.split("\n");
+      let inTastingNotes = false;
+      for (const line of lines) {
+        const lower = line.toLowerCase();
+        if (lower.startsWith("brewer: ")) {
+          meta.brewer = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
+        } else if (lower.startsWith("grinder: ")) {
+          meta.grinder = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
+        } else if (line.trim().toLowerCase() === "### tasting notes") {
+          inTastingNotes = true;
+        } else if (inTastingNotes && /^[-*]\s+/.test(line)) {
+          meta.notes.push(line.replace(/^[-*]\s+/, "").trim());
+        } else if (inTastingNotes && line.startsWith("#")) {
+          inTastingNotes = false;
+        }
+      }
+      recipeMetadata.set(item.number, meta);
+    } catch (_) {}
+  });
+  await Promise.all(recipeFetchPromises);
+  baseItems.forEach((item) => {
+    const meta = recipeMetadata.get(item.number);
+    if (meta) {
+      item.brewer = meta.brewer;
+      item.grinder = meta.grinder;
+      item.notes = item.notes?.length ? item.notes : meta.notes;
+    }
+  });
+
   // Initialize filteredBaseItems with all items
   filteredBaseItems = baseItems;
 
@@ -357,43 +397,46 @@ async function main() {
   }
   centerOnFirstBag();
 
-  // Rebuild layout for search results
+  // Rebuild layout for search and filter results
   function rebuildLayoutForSearch(query) {
     // Start transition
     searchTransitionAlpha = 0;
-    
-    // Filter items based on search query
-    if (query.trim() === "") {
-      filteredBaseItems = baseItems;
-    } else {
-      const lowerQuery = query.toLowerCase();
-      filteredBaseItems = baseItems.filter(item => {
-        // Search in name
-        const name = (item.name || "").toLowerCase();
-        // Search in tags (array)
-        const tagsMatch = Array.isArray(item.tags) 
-          ? item.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-          : false;
-        // Search by number
-        const numberMatch = String(item.number).includes(lowerQuery);
-        
-        return name.includes(lowerQuery) || tagsMatch || numberMatch;
+
+    // First apply filters to get filter-matched set
+    let items = baseItems;
+    const hasFilters = Object.values(activeFilters).some((arr) => arr.length > 0);
+    if (hasFilters) {
+      items = baseItems.filter((item) => {
+        if (activeFilters.type.length && !activeFilters.type.some((t) => (item.tags || []).includes(t))) return false;
+        if (activeFilters.rating.length && !activeFilters.rating.includes(String(item.rating))) return false;
+        if (activeFilters.brewer.length && !activeFilters.brewer.some((b) => (item.brewer || []).includes(b))) return false;
+        if (activeFilters.grinder.length && !activeFilters.grinder.some((g) => (item.grinder || []).includes(g))) return false;
+        if (activeFilters.tastingNotes.length && !activeFilters.tastingNotes.some((n) => (item.notes || []).includes(n))) return false;
+        return true;
       });
     }
-    
-    // If no results, keep showing all items but could add "no results" message
-    if (filteredBaseItems.length === 0) {
-      filteredBaseItems = baseItems;
+
+    // Then apply search within filter results
+    if (query.trim() !== "") {
+      const lowerQuery = query.toLowerCase();
+      items = items.filter((item) => {
+        const name = (item.name || "").toLowerCase();
+        const tagsMatch = Array.isArray(item.tags) ? item.tags.some((tag) => tag.toLowerCase().includes(lowerQuery)) : false;
+        const numberMatch = String(item.number).includes(lowerQuery);
+        const notesMatch = Array.isArray(item.notes) ? item.notes.some((n) => n.toLowerCase().includes(lowerQuery)) : false;
+        return name.includes(lowerQuery) || tagsMatch || numberMatch || notesMatch;
+      });
     }
-    
-    // Rebuild duplicated items and layout
+
+    filteredBaseItems = items;
+    noMatchFound = items.length === 0 && (query.trim() !== "" || hasFilters);
+
+    const noMatchEl = document.querySelector(".no-match-overlay");
+    if (noMatchEl) noMatchEl.style.display = noMatchFound ? "flex" : "none";
+
     duplicatedItems = createDuplicatedItems(filteredBaseItems);
     tileItems = createTileLayout();
-    
-    // Center on first result with smooth transition
     centerOnFirstBag();
-    
-    // Clear hover state
     hoveredItem = null;
     lastHoveredItem = null;
   }
@@ -792,27 +835,82 @@ async function main() {
     targetCamY += deltaY * 1.2;
   }, { passive: false });
 
-  // Search bar element
+  // Search bar + filter button (same combined width as before)
   const searchBar = document.createElement("div");
   searchBar.className = "search-bar";
   searchBar.innerHTML = `
-    <div class="search-container">
-      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"></circle>
-        <path d="M21 21l-4.35-4.35"></path>
-      </svg>
-      <input type="text" class="search-input" placeholder="Search recipes..." />
-      <button class="search-clear" style="display: none;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12"></path>
+    <div class="search-row">
+      <div class="search-container">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="M21 21l-4.35-4.35"></path>
+        </svg>
+        <input type="text" class="search-input" placeholder="Search recipes..." />
+        <button class="search-clear" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <button class="filter-btn" type="button" aria-label="Filter recipes">
+        <span class="filter-dot"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+          <line x1="20" y1="21" x2="20" y2="16"></line>
+          <line x1="20" y1="12" x2="20" y2="3"></line>
+          <line x1="1" y1="14" x2="7" y2="14"></line>
+          <line x1="9" y1="8" x2="15" y2="8"></line>
+          <line x1="17" y1="16" x2="23" y2="16"></line>
         </svg>
       </button>
     </div>
   `;
   document.body.appendChild(searchBar);
+
+  // No match overlay with Show all button
+  const noMatchOverlay = document.createElement("div");
+  noMatchOverlay.className = "no-match-overlay";
+  noMatchOverlay.style.display = "none";
+  noMatchOverlay.innerHTML = `
+    <div class="no-match-content">
+      <p class="no-match-text">No match found</p>
+      <button class="no-match-show-all-btn" type="button">Show all</button>
+    </div>
+  `;
+  document.body.appendChild(noMatchOverlay);
+
+  noMatchOverlay.querySelector(".no-match-show-all-btn").addEventListener("click", () => {
+    searchQuery = "";
+    searchInput.value = "";
+    searchClear.style.display = "none";
+    Object.keys(activeFilters).forEach((k) => (activeFilters[k] = []));
+    document.querySelectorAll(".filter-pill").forEach((p) => p.classList.remove("selected"));
+    noMatchOverlay.style.display = "none";
+    updateFilterDot();
+    if (typeof updateFilterClearButton === "function") updateFilterClearButton();
+    rebuildLayoutForSearch("");
+  });
   
   const searchInput = searchBar.querySelector(".search-input");
   const searchClear = searchBar.querySelector(".search-clear");
+  const filterBtn = searchBar.querySelector(".filter-btn");
+  const filterDot = searchBar.querySelector(".filter-dot");
+
+  function hasActiveFilters() {
+    return Object.values(activeFilters).some((arr) => arr.length > 0);
+  }
+
+  function updateFilterDot() {
+    filterDot.style.display = hasActiveFilters() ? "block" : "none";
+  }
+
+  function updateFilterClearButton() {
+    const clearBtn = filterOverlay.querySelector(".filter-clear-btn");
+    if (clearBtn) clearBtn.style.display = hasActiveFilters() ? "block" : "none";
+  }
   
   let searchTimeout = null;
   
@@ -836,7 +934,7 @@ async function main() {
     searchInput.focus();
   });
   
-  // Prevent drag events from interfering with search
+  // Prevent drag events from interfering with search and filter
   searchBar.addEventListener("mousedown", (e) => e.stopPropagation());
   searchBar.addEventListener("touchstart", (e) => e.stopPropagation());
   
@@ -857,6 +955,121 @@ async function main() {
         rebuildLayoutForSearch("");
       }
     }
+  });
+
+  // Filter modal
+  const filterOptions = {
+    type: [...new Set(baseItems.flatMap((i) => i.tags || []))].sort(),
+    brewer: [...new Set(baseItems.flatMap((i) => i.brewer || []))].sort(),
+    grinder: [...new Set(baseItems.flatMap((i) => i.grinder || []))].sort(),
+    rating: ["3", "4", "5"],
+    tastingNotes: [...new Set(baseItems.flatMap((i) => i.notes || []))].sort(),
+  };
+
+  const filterOverlay = document.createElement("div");
+  filterOverlay.className = "overlay filter-overlay";
+  filterOverlay.innerHTML = `
+    <div class="modal filter-modal" role="dialog" aria-modal="true">
+      <div class="filter-modal-header">
+        <h2 class="filter-modal-title">Filter</h2>
+        <div class="filter-modal-actions">
+          <button class="filter-clear-btn" type="button">Clear</button>
+          <button class="closeBtn filter-close-btn" type="button" aria-label="Close">×</button>
+        </div>
+      </div>
+      <div class="filter-modal-body">
+        <div class="filter-section" data-category="type">
+          <h3 class="filter-section-title">Type</h3>
+          <div class="filter-pill-row"></div>
+        </div>
+        <div class="filter-section" data-category="brewer">
+          <h3 class="filter-section-title">Brewer</h3>
+          <div class="filter-pill-row"></div>
+        </div>
+        <div class="filter-section" data-category="grinder">
+          <h3 class="filter-section-title">Grinder</h3>
+          <div class="filter-pill-row"></div>
+        </div>
+        <div class="filter-section" data-category="rating">
+          <h3 class="filter-section-title">Rating</h3>
+          <div class="filter-pill-row"></div>
+        </div>
+        <div class="filter-section" data-category="tastingNotes">
+          <h3 class="filter-section-title">Tasting Notes</h3>
+          <div class="filter-pill-row"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(filterOverlay);
+
+  // Populate filter pills
+  Object.entries(filterOptions).forEach(([category, values]) => {
+    const row = filterOverlay.querySelector(`.filter-section[data-category="${category}"] .filter-pill-row`);
+    if (!row) return;
+    const displayValues = category === "rating" ? values.map((r) => "★".repeat(parseInt(r, 10))) : values;
+    values.forEach((value, idx) => {
+      const pill = document.createElement("button");
+      pill.className = "filter-pill";
+      pill.type = "button";
+      pill.dataset.category = category;
+      pill.dataset.value = value;
+      pill.textContent = displayValues[idx];
+      row.appendChild(pill);
+    });
+  });
+
+  filterOverlay.querySelectorAll(".filter-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      const cat = pill.dataset.category;
+      const val = pill.dataset.value;
+      const arr = activeFilters[cat];
+      const idx = arr.indexOf(val);
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+      } else {
+        arr.push(val);
+      }
+      pill.classList.toggle("selected", arr.includes(val));
+      rebuildLayoutForSearch(searchQuery);
+      updateFilterDot();
+      updateFilterClearButton();
+    });
+  });
+
+  filterOverlay.querySelector(".filter-clear-btn").addEventListener("click", () => {
+    Object.keys(activeFilters).forEach((k) => (activeFilters[k] = []));
+    filterOverlay.querySelectorAll(".filter-pill").forEach((p) => p.classList.remove("selected"));
+    rebuildLayoutForSearch(searchQuery);
+    updateFilterDot();
+    updateFilterClearButton();
+  });
+
+  filterOverlay.querySelector(".filter-close-btn").addEventListener("click", () => {
+    filterOverlay.classList.remove("open");
+    filterOverlay.style.display = "none";
+    filterOverlay.style.visibility = "hidden";
+  });
+
+  filterOverlay.addEventListener("click", (e) => {
+    if (e.target === filterOverlay) {
+      filterOverlay.classList.remove("open");
+      filterOverlay.style.display = "none";
+      filterOverlay.style.visibility = "hidden";
+    }
+  });
+
+  filterBtn.addEventListener("click", () => {
+    filterOverlay.classList.add("open");
+    filterOverlay.style.display = "flex";
+    filterOverlay.style.visibility = "visible";
+    filterOverlay.style.opacity = "1";
+    filterOverlay.style.zIndex = "2000";
+    // Sync pill selected state
+    filterOverlay.querySelectorAll(".filter-pill").forEach((p) => {
+      p.classList.toggle("selected", activeFilters[p.dataset.category].includes(p.dataset.value));
+    });
+    updateFilterClearButton();
   });
 
   // Modal
@@ -1108,7 +1321,15 @@ async function main() {
     if (e.target === overlay) closeModal();
   });
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
+    if (e.key === "Escape") {
+      if (filterOverlay.classList.contains("open")) {
+        filterOverlay.classList.remove("open");
+        filterOverlay.style.display = "none";
+        filterOverlay.style.visibility = "hidden";
+      } else {
+        closeModal();
+      }
+    }
   });
 }
 
