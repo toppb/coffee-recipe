@@ -4,6 +4,21 @@ A beautiful, interactive coffee recipe website featuring an infinite scrollable 
 
 ## ✨ Features
 
+### V2 – Search & Filter
+
+- **Search**: Search by name, tags, tasting notes, or coffee number. Results update as you type. Use `/` to focus the search bar.
+- **Filter Modal**: Filter coffee bags by:
+  - **Type** (Espresso, Pourover, Aeropress, etc.)
+  - **Brewer** (Gaggia Classic Pro, Niche Zero, Hario V60, etc.)
+  - **Grinder** (Niche Zero, Hario Slim Hand Grinder, etc.)
+  - **Rating** (3–5 stars)
+  - **Tasting Notes** (Chocolate, Citrus, Fruity, etc.)
+- **Combined Search & Filter**: Apply filters first, then search within results—or search first, then refine with filters.
+- **Active Filter Indicator**: A dot on the filter button shows when filters are applied.
+- **No Match State**: When no results match, a "Show all" button resets search and filters.
+
+### Core Features
+
 - **Infinite Grid Layout**: Seamlessly scrollable masonry grid with drag-to-explore navigation
 - **Interactive Coffee Bags**: Click any bag to open a detailed modal with:
   - Coffee information (roaster, origin, process)
@@ -61,6 +76,7 @@ npm run preview
 coffee-grid/
 ├── public/
 │   ├── bags/          # Coffee bag images (coffee-bag-01.png, etc.)
+│   ├── data/          # coffee.json - metadata (name, tags, rating, etc.)
 │   └── recipes/       # Markdown recipe files (coffee-01.md, etc.)
 ├── src/
 │   ├── data/
@@ -126,11 +142,10 @@ This project can be easily deployed to:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🗺️ Roadmap (V1)
+## 🗺️ Roadmap
 
-This is Version 1 of Coffee Grid. Future versions may include:
+Future versions may include:
 
-- Search and filter functionality
 - Favorites/bookmarking system
 - Recipe sharing
 - More customization options
