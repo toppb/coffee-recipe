@@ -1313,6 +1313,7 @@ async function main() {
       <form class="auth-form" id="authForm">
         <input type="text" name="username" placeholder="Username" class="auth-input auth-username-input"
                pattern="[a-z0-9][a-z0-9_\\-]{1,28}[a-z0-9]" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
                style="display:none" />
         <input type="email" name="email" placeholder="Email" required class="auth-input" autocomplete="email" />
         <input type="password" name="password" placeholder="Password" required class="auth-input" autocomplete="current-password" />
@@ -1349,6 +1350,13 @@ async function main() {
     usernameInput.required = signUp;
     authOverlay.querySelector("#authError").textContent = "";
   }
+
+  // Auto-lowercase username as user types (iOS capitalises first letter)
+  authOverlay.querySelector('[name="username"]').addEventListener("input", (e) => {
+    const pos = e.target.selectionStart;
+    e.target.value = e.target.value.toLowerCase();
+    e.target.setSelectionRange(pos, pos);
+  });
 
   function openAuthModal(signUp = false) {
     setAuthMode(signUp);
