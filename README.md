@@ -1,6 +1,6 @@
-# Coffee Grid
+# Brewist
 
-A beautiful, interactive coffee recipe website featuring an infinite scrollable grid of coffee bags. Click on any bag to view detailed brewing recipes and tasting notes.
+A multi-user coffee recipe platform. Sign up, get your own canvas at `brewist.co/#/username`, and build a personal collection of coffee recipes on an infinite scrollable grid.
 
 ## ✨ Features
 
@@ -17,12 +17,21 @@ A beautiful, interactive coffee recipe website featuring an infinite scrollable 
 - **Active Filter Indicator**: A dot on the filter button shows when filters are applied.
 - **No Match State**: When no results match, a "Show all" button resets search and filters.
 
+### V4 – Multi-User Platform
+
+- **Sign Up / Sign In**: Anyone can create an account with a username and get their own canvas at `/#/username`.
+- **Personal Canvas**: Each user's coffee collection lives at their own URL — fully public to view, owner-only to edit.
+- **Recipe Creation**: Add coffees directly from your canvas — name, rating, origin, process, tasting notes, recipe, and bag image all editable in-app.
+- **Image Upload**: Upload a bag photo or let the app generate a placeholder illustration (randomised shape + colour).
+- **Public Profiles**: Share your canvas URL with anyone — no account needed to browse.
+- **Owner Controls**: Edit and delete buttons only appear when you're viewing your own canvas.
+- **Landing Page**: Visitors who aren't signed in see a clean landing page with Sign up / Sign in.
+
 ### V3 – Editable Metadata (Supabase)
 
 - **Inline Editing**: When using Supabase, sign in to edit coffee metadata directly in the app.
 - **Editable Fields**: Name, rating, tags, roaster, origin, process, tasting notes, brewer, grinder, recipe markdown, and bag image.
 - **Image Upload**: Replace coffee bag images via the edit form; images are stored in Supabase Storage.
-- **Single Admin**: One authenticated user can edit; sign-up can be disabled for a personal recipe app.
 - **Fallback**: Without Supabase configuration, the app works with static JSON and recipe files as before.
 
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for setup instructions.
@@ -66,12 +75,12 @@ npm run dev
 
 4. Open your browser and navigate to `http://localhost:5173`
 
-### Optional: Enable Editable Metadata (Supabase)
+### Enable Supabase (required for auth + editing)
 
 1. Create a Supabase project and follow [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
-2. Copy `.env.example` to `.env` and add your `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-3. Run `npm run migrate` to seed data (requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`).
-4. Sign in via the "Sign in" button to edit coffee metadata.
+2. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+3. Run the migrations in `supabase/migrations/` (001–008) via the Supabase SQL editor.
+4. Sign up at the landing page to get your own canvas.
 
 ## 📦 Building for Production
 
@@ -169,7 +178,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Future versions may include:
 
 - Favorites/bookmarking system
-- Recipe sharing
+- Follow other users' canvases
 - More customization options
 - Performance optimizations
 
