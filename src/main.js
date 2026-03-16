@@ -149,7 +149,7 @@ async function main() {
 
   // ── Routing ────────────────────────────────────────────────────────
   function getRouteUsername() {
-    const match = window.location.hash.match(/^#\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])$/);
+    const match = window.location.pathname.match(/^\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])$/);
     return match ? match[1] : null;
   }
 
@@ -163,7 +163,7 @@ async function main() {
     } else if (authSession && currentUserProfile) {
       viewingProfile = currentUserProfile;
       viewingUserId = currentUserProfile.id;
-      window.location.hash = `#/${currentUserProfile.username}`;
+      history.pushState({}, '', `/${currentUserProfile.username}`);
     } else {
       return { found: false, landing: true };
     }
@@ -1395,7 +1395,7 @@ async function main() {
           viewingProfile = currentUserProfile;
           viewingUserId = currentUserProfile.id;
           isOwner = true;
-          window.location.hash = `#/${currentUserProfile.username}`;
+          history.pushState({}, '', `/${currentUserProfile.username}`);
           await reloadCanvasData();
         }
       } else {
@@ -1419,7 +1419,7 @@ async function main() {
           "Your personal canvas of coffee recipes";
         authBtn.style.display = "none";
         await supabase.auth.signOut();
-        window.location.hash = "";
+        history.pushState({}, '', '/');
       } else {
         openAuthModal(false);
       }
@@ -1474,7 +1474,7 @@ async function main() {
         viewingUserId = currentUserProfile.id;
         isOwner = true;
         closeAuthModal();
-        window.location.hash = `#/${username}`;
+        history.pushState({}, '', `/${username}`);
         await reloadCanvasData();
         updateAuthUI();
         if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
@@ -1490,8 +1490,8 @@ async function main() {
     landingPage.querySelector(".landing-btn--signin")?.addEventListener("click", () => openAuthModal(false));
     landingPage.querySelector(".landing-btn--signup")?.addEventListener("click", () => openAuthModal(true));
 
-    // Hash change listener — navigate between user canvases
-    window.addEventListener("hashchange", async () => {
+    // Path change listener — navigate between user canvases (browser back/forward)
+    window.addEventListener("popstate", async () => {
       const result = await resolveRoute();
       if (result.found) {
         await reloadCanvasData();
