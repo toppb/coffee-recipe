@@ -1,4 +1,5 @@
 import "./style.css";
+import { supabase, hasSupabase } from "./supabase.js";
 
 // Simple markdown parser
 function parseMarkdown(md) {
@@ -95,14 +96,118 @@ function parseMarkdown(md) {
   return html;
 }
 
-async function main() {
-  // Fetch data
-  const res = await fetch("/data/coffee.json", { cache: "default" });
-  const data = await res.json();
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
-  // Helper functions
+function extractRecipeContent(markdown) {
+  if (!markdown) return "";
+  const lines = markdown.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().startsWith("## ")) {
+      return lines.slice(i).join("\n").trim();
+    }
+  }
+  return markdown;
+}
+
+async function main() {
   const pad2 = (n) => String(n).padStart(2, "0");
   const imgFor = (n) => `/bags/coffee-bag-${pad2(n)}.png`;
+
+  // ── Multi-user state ──────────────────────────────────────────────────
+  let authSession = null;
+  let currentUserProfile = null;  // logged-in user's profile
+  let viewingUserId = null;       // whose canvas we're viewing
+  let viewingProfile = null;      // profile of canvas owner
+  let isOwner = false;            // logged-in user owns this canvas
+  let loadGeneration = 0;         // race condition guard for reloads
+
+  async function getProfileByUsername(username) {
+    if (!hasSupabase) return null;
+    const { data } = await supabase
+      .from("profiles").select("id, username, display_name")
+      .eq("username", username).single();
+    return data;
+  }
+  async function getProfileByUserId(userId) {
+    if (!hasSupabase) return null;
+    const { data } = await supabase
+      .from("profiles").select("id, username, display_name")
+      .eq("id", userId).single();
+    return data;
+  }
+
+  // Get auth session early (before data fetch + routing)
+  if (hasSupabase) {
+    const { data: { session } } = await supabase.auth.getSession();
+    authSession = session;
+    if (authSession) {
+      currentUserProfile = await getProfileByUserId(authSession.user.id);
+    }
+  }
+
+  // ── Routing ────────────────────────────────────────────────────────
+  function getRouteUsername() {
+    const match = window.location.hash.match(/^#\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])$/);
+    return match ? match[1] : null;
+  }
+
+  async function resolveRoute() {
+    const routeUsername = getRouteUsername();
+    if (routeUsername) {
+      const profile = await getProfileByUsername(routeUsername);
+      if (!profile) return { found: false, username: routeUsername };
+      viewingProfile = profile;
+      viewingUserId = profile.id;
+    } else if (authSession && currentUserProfile) {
+      viewingProfile = currentUserProfile;
+      viewingUserId = currentUserProfile.id;
+      window.location.hash = `#/${currentUserProfile.username}`;
+    } else {
+      return { found: false, landing: true };
+    }
+    isOwner = authSession?.user?.id === viewingUserId;
+    return { found: true };
+  }
+
+  async function loadCoffeesForUser(userId) {
+    let { data: rows, error } = await supabase
+      .from("coffees").select("*")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("number");
+    if (error) {
+      ({ data: rows, error } = await supabase
+        .from("coffees").select("*")
+        .eq("user_id", userId)
+        .order("number"));
+    }
+    if (!error && rows?.length) {
+      return rows.map((r) => ({
+        id: r.id, number: r.number, name: r.name, rating: r.rating,
+        tags: r.tags || [], img: r.img_url || imgFor(r.number),
+        roaster: r.roaster || "", origin: r.origin || "",
+        process: r.process || "", notes: r.notes || [],
+        brew: r.brew || "", brewer: r.brewer || [],
+        grinder: r.grinder || [], recipe_body: r.recipe_body || "",
+      }));
+    }
+    return [];
+  }
+
+  const routeResult = await resolveRoute();
+
+  // ── Fetch data: Supabase (scoped to user) or static fallback ────────
+  let rawData = [];
+  let fromSupabase = false;
+  if (routeResult.found && hasSupabase) {
+    rawData = await loadCoffeesForUser(viewingUserId);
+    fromSupabase = true;
+  } else if (!hasSupabase) {
+    const res = await fetch("/data/coffee.json", { cache: "default" });
+    rawData = await res.json();
+  }
 
   // Create canvas
   const canvas = document.createElement("canvas");
@@ -127,6 +232,34 @@ async function main() {
   }
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
+
+  // ── Landing page (shown when not logged in and no username in URL) ──
+  const landingPage = document.createElement("div");
+  landingPage.className = "landing-page";
+  landingPage.innerHTML = `
+    <div class="landing-content">
+      <h1 class="landing-title">Coffee Recipes</h1>
+      <p class="landing-subtitle">Your personal canvas of coffee recipes</p>
+      <div class="landing-buttons">
+        <button class="landing-btn landing-btn--signup" type="button">Sign up</button>
+        <button class="landing-btn landing-btn--signin" type="button">Sign in</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(landingPage);
+
+  const isLanding = routeResult.landing === true;
+  const isNotFound = !routeResult.found && !routeResult.landing;
+  if (isLanding || isNotFound) {
+    canvas.style.display = "none";
+    landingPage.style.display = "flex";
+    if (isNotFound) {
+      landingPage.querySelector(".landing-subtitle").textContent =
+        `No canvas found for @${routeResult.username}`;
+    }
+  } else {
+    landingPage.style.display = "none";
+  }
 
   // Tile dimensions - 10 columns makes bags ~25% smaller
   const TILE_WIDTH = 2400;
@@ -171,50 +304,52 @@ async function main() {
   let noMatchFound = false;
 
   // Items setup - use actual image dimensions (no resizing)
-  const baseItems = data.map((d) => {
+  let baseItems = rawData.map((d) => {
     const number = Number(d.number);
     return {
       ...d,
       number,
-      img: imgFor(number),
+      img: d.img || imgFor(number),
     };
   });
 
-  // Fetch recipe metadata to enrich items with brewer, grinder, tasting notes
-  const recipeMetadata = new Map();
-  const recipeFetchPromises = baseItems.map(async (item) => {
-    try {
-      const res = await fetch(`/recipes/coffee-${pad2(item.number)}.md`, { cache: "default" });
-      const md = await res.text();
-      const meta = { brewer: [], grinder: [], notes: [] };
-      const lines = md.split("\n");
-      let inTastingNotes = false;
-      for (const line of lines) {
-        const lower = line.toLowerCase();
-        if (lower.startsWith("brewer: ")) {
-          meta.brewer = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
-        } else if (lower.startsWith("grinder: ")) {
-          meta.grinder = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
-        } else if (line.trim().toLowerCase() === "### tasting notes") {
-          inTastingNotes = true;
-        } else if (inTastingNotes && /^[-*]\s+/.test(line)) {
-          meta.notes.push(line.replace(/^[-*]\s+/, "").trim());
-        } else if (inTastingNotes && line.startsWith("#")) {
-          inTastingNotes = false;
+  // Fetch recipe metadata (only when using static files)
+  if (!fromSupabase) {
+    const recipeMetadata = new Map();
+    const recipeFetchPromises = baseItems.map(async (item) => {
+      try {
+        const res = await fetch(`/recipes/coffee-${pad2(item.number)}.md`, { cache: "default" });
+        const md = await res.text();
+        const meta = { brewer: [], grinder: [], notes: [] };
+        const lines = md.split("\n");
+        let inTastingNotes = false;
+        for (const line of lines) {
+          const lower = line.toLowerCase();
+          if (lower.startsWith("brewer: ")) {
+            meta.brewer = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
+          } else if (lower.startsWith("grinder: ")) {
+            meta.grinder = line.substring(line.indexOf(":") + 1).split(",").map((s) => s.trim()).filter(Boolean);
+          } else if (line.trim().toLowerCase() === "### tasting notes") {
+            inTastingNotes = true;
+          } else if (inTastingNotes && /^[-*]\s+/.test(line)) {
+            meta.notes.push(line.replace(/^[-*]\s+/, "").trim());
+          } else if (inTastingNotes && line.startsWith("#")) {
+            inTastingNotes = false;
+          }
         }
+        recipeMetadata.set(item.number, meta);
+      } catch (_) {}
+    });
+    await Promise.all(recipeFetchPromises);
+    baseItems.forEach((item) => {
+      const meta = recipeMetadata.get(item.number);
+      if (meta) {
+        item.brewer = meta.brewer;
+        item.grinder = meta.grinder;
+        item.notes = item.notes?.length ? item.notes : meta.notes;
       }
-      recipeMetadata.set(item.number, meta);
-    } catch (_) {}
-  });
-  await Promise.all(recipeFetchPromises);
-  baseItems.forEach((item) => {
-    const meta = recipeMetadata.get(item.number);
-    if (meta) {
-      item.brewer = meta.brewer;
-      item.grinder = meta.grinder;
-      item.notes = item.notes?.length ? item.notes : meta.notes;
-    }
-  });
+    });
+  }
 
   // Initialize filteredBaseItems with all items
   filteredBaseItems = baseItems;
@@ -249,23 +384,196 @@ async function main() {
   const imageCache = new Map();
   const imageDimensions = new Map();
   
-  const imageLoadPromises = baseItems.map((item) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        imageCache.set(item.number, img);
-        // Store actual dimensions for aspect ratio calculation
-        imageDimensions.set(item.number, {
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          aspectRatio: img.naturalHeight / img.naturalWidth
-        });
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = item.img;
-    });
-  });
+  // Fixed size for items without an image (portrait ratio matching most coffee bags)
+  const PLACEHOLDER_W = 200;
+  const PLACEHOLDER_H = 300;
+
+  // Colour palette cycled across placeholder bags — body, seal, text, crimp-line colour
+  const BAG_PALETTE = [
+    { body: "#C5A87A", seal: "#A8895A", text: "rgba(70,45,15,0.6)",      crimp: "rgba(0,0,0,0.22)"    }, // kraft
+    { body: "#E2D49A", seal: "#C8BA72", text: "rgba(60,45,10,0.6)",      crimp: "rgba(0,0,0,0.18)"    }, // manila
+    { body: "#EDEAE3", seal: "#D0CBC0", text: "rgba(50,45,38,0.55)",     crimp: "rgba(0,0,0,0.15)"    }, // off-white
+    { body: "#3E3C39", seal: "#2C2A27", text: "rgba(240,235,225,0.65)",  crimp: "rgba(255,255,255,0.2)" }, // dark grey
+  ];
+
+  // ─── Canvas bag-shape drawing helpers ────────────────────────────────────
+
+  function _bagGradient(ctx, bx, by, bw, bh) {
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    g.addColorStop(0,   "rgba(0,0,0,0.13)");
+    g.addColorStop(0.1, "rgba(0,0,0,0.03)");
+    g.addColorStop(0.5, "rgba(255,255,255,0.03)");
+    g.addColorStop(0.9, "rgba(0,0,0,0.03)");
+    g.addColorStop(1,   "rgba(0,0,0,0.13)");
+    ctx.fillStyle = g;
+    ctx.fillRect(bx, by, bw, bh);
+  }
+
+  function _bagCrimp(ctx, x1, y, x2, sealH, count, col) {
+    ctx.strokeStyle = col.crimp;
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i <= count; i++) {
+      const ly = y + (sealH * i) / (count + 1);
+      ctx.beginPath(); ctx.moveTo(x1, ly); ctx.lineTo(x2, ly); ctx.stroke();
+    }
+  }
+
+  function _bagName(ctx, bx, bw, textBodyY, textBodyH, name, col) {
+    if (!name) return;
+    const pad = bw * 0.12;
+    const maxLineW = bw - pad * 2;
+    const fontSize = Math.max(11, Math.round(bw * 0.075));
+    ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = col.text;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const words = name.split(" ");
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? line + " " + word : word;
+      if (ctx.measureText(test).width > maxLineW && line) { lines.push(line); line = word; }
+      else { line = test; }
+    }
+    if (line) lines.push(line);
+    const lineH = fontSize * 1.4;
+    const totalH = lines.length * lineH;
+    const startY = textBodyY + textBodyH / 2 - totalH / 2 + lineH / 2;
+    lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, startY + i * lineH));
+    ctx.textAlign = "start";
+  }
+
+  // Shape 0 — Four-seal bag: plain rectangle, prominent top seal
+  function drawFourSealBag(ctx, bx, by, bw, bh, col, name) {
+    const sealH = Math.round(bh * 0.09);
+    const cr = Math.min(Math.round(bw * 0.025), 4);
+    const path = () => { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, cr); };
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
+    _bagGradient(ctx, bx, by, bw, bh);
+    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
+    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 3, col);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
+    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
+  }
+
+  // Shape 1 — Stand-up pouch: wide top, tapers toward bottom
+  function drawStandUpPouch(ctx, bx, by, bw, bh, col, name) {
+    const ti = bw * 0.05, sealH = Math.round(bh * 0.065);
+    const cr = Math.min(Math.round(bw * 0.03), 5);
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(bx, by); ctx.lineTo(bx + bw, by);
+      ctx.lineTo(bx + bw - ti, by + bh - cr);
+      ctx.quadraticCurveTo(bx + bw - ti, by + bh, bx + bw - ti - cr, by + bh);
+      ctx.lineTo(bx + ti + cr, by + bh);
+      ctx.quadraticCurveTo(bx + ti, by + bh, bx + ti, by + bh - cr);
+      ctx.closePath();
+    };
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
+    _bagGradient(ctx, bx, by, bw, bh);
+    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
+    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 4, col);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
+    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
+  }
+
+  // Shape 2 — Flat-bottom pouch: simple rounded rectangle with full-width seal
+  function drawFlatBottomPouch(ctx, bx, by, bw, bh, col, name) {
+    const cr = Math.min(Math.round(bw * 0.025), 5);
+    const sealH = Math.round(bh * 0.09);
+    const path = () => { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, cr); };
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
+    _bagGradient(ctx, bx, by, bw, bh);
+    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
+    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 3, col);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
+    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
+  }
+
+  // Shape 3 — Side-fold bag: narrow top, widens toward the bottom (inverse of stand-up pouch)
+  function drawSideFoldBag(ctx, bx, by, bw, bh, col, name) {
+    const ti = Math.round(bw * 0.05);
+    const cr = Math.min(Math.round(bw * 0.03), 5);
+    const sealH = Math.round(bh * 0.065);
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(bx + ti, by);
+      ctx.lineTo(bx + bw - ti, by);
+      ctx.lineTo(bx + bw, by + bh - cr);
+      ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - cr, by + bh);
+      ctx.lineTo(bx + cr, by + bh);
+      ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - cr);
+      ctx.closePath();
+    };
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
+    _bagGradient(ctx, bx, by, bw, bh);
+    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
+    _bagCrimp(ctx, bx + ti + 2, by, bx + bw - ti - 2, sealH, 3, col);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
+    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
+  }
+
+  const BAG_DRAW_FNS = [drawFourSealBag, drawStandUpPouch, drawFlatBottomPouch, drawSideFoldBag];
+
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async function loadImageToCache(itemNumber, src) {
+    if (!src) {
+      // No image — give it placeholder dimensions so it appears in the layout
+      imageDimensions.set(itemNumber, {
+        width: PLACEHOLDER_W,
+        height: PLACEHOLDER_H,
+        aspectRatio: PLACEHOLDER_H / PLACEHOLDER_W,
+      });
+      return;
+    }
+    try {
+      const resp = await fetch(src);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const bitmap = await createImageBitmap(blob);
+      imageCache.set(itemNumber, bitmap);
+      imageDimensions.set(itemNumber, {
+        width: bitmap.width,
+        height: bitmap.height,
+        aspectRatio: bitmap.height / bitmap.width,
+      });
+    } catch {
+      // Fallback to Image element if fetch/createImageBitmap fails (e.g. CORS)
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          imageCache.set(itemNumber, img);
+          imageDimensions.set(itemNumber, {
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            aspectRatio: img.naturalHeight / img.naturalWidth,
+          });
+          resolve();
+        };
+        img.onerror = () => {
+          // Image failed to load — use placeholder dimensions so it still appears
+          imageDimensions.set(itemNumber, {
+            width: PLACEHOLDER_W,
+            height: PLACEHOLDER_H,
+            aspectRatio: PLACEHOLDER_H / PLACEHOLDER_W,
+          });
+          resolve();
+        };
+        img.src = src;
+      });
+    }
+  }
+
+  const imageLoadPromises = baseItems.map((item) => loadImageToCache(item.number, item.img));
 
   // Wait for all images to load
   await Promise.all(imageLoadPromises);
@@ -565,11 +873,11 @@ async function main() {
               
               ctx.globalAlpha = 1;
             } else {
-              // Draw placeholder for unloaded images
-              ctx.fillStyle = "#E8E0D4";
-              ctx.beginPath();
-              ctx.roundRect(screenX, screenY, item.width, item.height, 12);
-              ctx.fill();
+              // Draw placeholder coffee bag — shape and colour vary by item number
+              const col = BAG_PALETTE[(item.number + 2) % BAG_PALETTE.length];
+              BAG_DRAW_FNS[item.number % BAG_DRAW_FNS.length](
+                ctx, screenX, screenY, item.width, item.height, col, item.name
+              );
             }
           }
         });
@@ -869,6 +1177,7 @@ async function main() {
     </div>
   `;
   document.body.appendChild(searchBar);
+  if (isLanding || isNotFound) searchBar.style.display = "none";
 
   // No match overlay with Show all button
   const noMatchOverlay = document.createElement("div");
@@ -881,6 +1190,23 @@ async function main() {
     </div>
   `;
   document.body.appendChild(noMatchOverlay);
+
+  // Empty canvas overlay — shown when the owner has no coffees yet
+  const emptyCanvasOverlay = document.createElement("div");
+  emptyCanvasOverlay.className = "no-match-overlay";
+  emptyCanvasOverlay.style.display = "none";
+  emptyCanvasOverlay.innerHTML = `
+    <div class="no-match-content">
+      <p class="no-match-text">Add your first recipe</p>
+      <button class="no-match-show-all-btn" type="button">Add coffee</button>
+    </div>
+  `;
+  document.body.appendChild(emptyCanvasOverlay);
+  emptyCanvasOverlay.querySelector("button").addEventListener("click", () => openEditor(null));
+  // Show on initial load if canvas is empty and user is the owner
+  if (baseItems.length === 0 && isOwner && !isLanding && !isNotFound) {
+    emptyCanvasOverlay.style.display = "flex";
+  }
 
   noMatchOverlay.querySelector(".no-match-show-all-btn").addEventListener("click", () => {
     searchQuery = "";
@@ -937,6 +1263,245 @@ async function main() {
   // Prevent drag events from interfering with search and filter
   searchBar.addEventListener("mousedown", (e) => e.stopPropagation());
   searchBar.addEventListener("touchstart", (e) => e.stopPropagation());
+
+  // ── Reload canvas for a different user ────────────────────────────────
+  async function reloadCanvasData() {
+    const gen = ++loadGeneration;
+    const newData = hasSupabase && viewingUserId
+      ? await loadCoffeesForUser(viewingUserId)
+      : [];
+    if (gen !== loadGeneration) return; // stale load, discard
+
+    baseItems = newData.map((d) => {
+      const number = Number(d.number);
+      return { ...d, number, img: d.img || imgFor(number) };
+    });
+
+    imageCache.clear();
+    imageDimensions.clear();
+    await Promise.all(baseItems.map((item) => loadImageToCache(item.number, item.img)));
+
+    searchQuery = "";
+    searchInput.value = "";
+    activeFilters = { type: [], brewer: [], grinder: [], rating: [], tastingNotes: [] };
+    filteredBaseItems = baseItems;
+    duplicatedItems = createDuplicatedItems(filteredBaseItems);
+    tileItems = createTileLayout();
+
+    // Reset camera
+    camX = 0; camY = 0; targetCamX = 0; targetCamY = 0;
+    velocityX = 0; velocityY = 0;
+    hoveredItem = null; lastHoveredItem = null;
+
+    // Show/hide canvas vs landing
+    canvas.style.display = "block";
+    landingPage.style.display = "none";
+    searchBar.style.display = "";
+    noMatchOverlay.style.display = "none";
+    emptyCanvasOverlay.style.display = baseItems.length === 0 && isOwner ? "flex" : "none";
+  }
+
+  // ── Auth UI (signup + signin) ─────────────────────────────────────────
+  let authIsSignUp = false;
+
+  const authOverlay = document.createElement("div");
+  authOverlay.className = "overlay auth-overlay";
+  authOverlay.style.display = "none";
+  authOverlay.innerHTML = `
+    <div class="modal auth-modal">
+      <h2 class="auth-title" id="authTitle">Sign in</h2>
+      <form class="auth-form" id="authForm">
+        <input type="text" name="username" placeholder="Username" class="auth-input auth-username-input"
+               pattern="[a-z0-9][a-z0-9_\\-]{1,28}[a-z0-9]" autocomplete="username"
+               style="display:none" />
+        <input type="email" name="email" placeholder="Email" required class="auth-input" autocomplete="email" />
+        <input type="password" name="password" placeholder="Password" required class="auth-input" autocomplete="current-password" />
+        <button type="submit" class="auth-submit" id="authSubmitBtn">Sign in</button>
+      </form>
+      <p class="auth-toggle">
+        <span id="authToggleText">Don&rsquo;t have an account?</span>
+        <a href="#" id="authToggleLink">Sign up</a>
+      </p>
+      <p class="auth-error" id="authError"></p>
+    </div>
+  `;
+  document.body.appendChild(authOverlay);
+
+  const authBtn = document.createElement("button");
+  authBtn.className = "auth-btn";
+  authBtn.type = "button";
+  authBtn.textContent = authSession ? "Log out" : "Sign in";
+  authBtn.style.display = hasSupabase && !isLanding && !isNotFound ? "block" : "none";
+  document.body.appendChild(authBtn);
+
+  function setAuthMode(signUp) {
+    authIsSignUp = signUp;
+    const title = authOverlay.querySelector("#authTitle");
+    const submit = authOverlay.querySelector("#authSubmitBtn");
+    const toggle = authOverlay.querySelector("#authToggleText");
+    const link = authOverlay.querySelector("#authToggleLink");
+    const usernameInput = authOverlay.querySelector('[name="username"]');
+    title.textContent = signUp ? "Sign up" : "Sign in";
+    submit.textContent = signUp ? "Sign up" : "Sign in";
+    toggle.textContent = signUp ? "Already have an account?" : "Don\u2019t have an account?";
+    link.textContent = signUp ? "Sign in" : "Sign up";
+    usernameInput.style.display = signUp ? "" : "none";
+    usernameInput.required = signUp;
+    authOverlay.querySelector("#authError").textContent = "";
+  }
+
+  function openAuthModal(signUp = false) {
+    setAuthMode(signUp);
+    authOverlay.classList.add("open");
+    authOverlay.style.display = "flex";
+    authOverlay.style.visibility = "visible";
+    authOverlay.style.opacity = "1";
+    authOverlay.style.zIndex = "2000";
+  }
+
+  function closeAuthModal() {
+    authOverlay.classList.remove("open");
+    authOverlay.style.display = "none";
+    authOverlay.querySelector("#authForm").reset();
+    authOverlay.querySelector("#authError").textContent = "";
+  }
+
+  function updateAuthUI() {
+    if (!hasSupabase) return;
+    authBtn.textContent = authSession ? "Log out" : "Sign in";
+    // Hide on landing page — it has its own sign-in/sign-up buttons
+    authBtn.style.display = landingPage.style.display === "flex" ? "none" : "block";
+  }
+
+  if (hasSupabase) {
+    // Auth state listener
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      authSession = session;
+      if (session) {
+        // Skip if signup handler already set the profile
+        if (!currentUserProfile || currentUserProfile.id !== session.user.id) {
+          currentUserProfile = await getProfileByUserId(session.user.id);
+        }
+        closeAuthModal();
+        if (currentUserProfile && viewingUserId !== currentUserProfile.id) {
+          viewingProfile = currentUserProfile;
+          viewingUserId = currentUserProfile.id;
+          isOwner = true;
+          window.location.hash = `#/${currentUserProfile.username}`;
+          await reloadCanvasData();
+        }
+      } else {
+        currentUserProfile = null;
+        viewingUserId = null;
+        viewingProfile = null;
+        isOwner = false;
+      }
+      updateAuthUI();
+      if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+    });
+
+    // Auth button — log out or open sign-in modal
+    authBtn.addEventListener("click", async () => {
+      if (authSession) {
+        // Show landing first so updateAuthUI (fired by signOut) hides the button
+        canvas.style.display = "none";
+        searchBar.style.display = "none";
+        landingPage.style.display = "flex";
+        landingPage.querySelector(".landing-subtitle").textContent =
+          "Your personal canvas of coffee recipes";
+        authBtn.style.display = "none";
+        await supabase.auth.signOut();
+        window.location.hash = "";
+      } else {
+        openAuthModal(false);
+      }
+    });
+
+    // Close on backdrop click
+    authOverlay.addEventListener("click", (e) => {
+      if (e.target === authOverlay) closeAuthModal();
+    });
+
+    // Toggle between sign-in / sign-up
+    authOverlay.querySelector("#authToggleLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      setAuthMode(!authIsSignUp);
+    });
+
+    // Form submit — sign in or sign up
+    authOverlay.querySelector("#authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const errEl = authOverlay.querySelector("#authError");
+      errEl.textContent = "";
+
+      const email = fd.get("email");
+      const password = fd.get("password");
+
+      if (authIsSignUp) {
+        // ── Sign up ──
+        const username = fd.get("username")?.toLowerCase().trim();
+        if (!username || !/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username)) {
+          errEl.textContent = "Username must be 3\u201330 characters: lowercase letters, numbers, hyphens, underscores.";
+          return;
+        }
+        // Check availability
+        const { data: existing } = await supabase
+          .from("profiles").select("id").eq("username", username).single();
+        if (existing) { errEl.textContent = "Username already taken."; return; }
+
+        // Create auth user
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+        if (signUpErr) { errEl.textContent = signUpErr.message; return; }
+
+        // Create profile
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .insert({ id: signUpData.user.id, username, display_name: username });
+        if (profileErr) { errEl.textContent = profileErr.message; return; }
+
+        // Set state directly — onAuthStateChange fires before profile exists, so we handle it here
+        currentUserProfile = { id: signUpData.user.id, username, display_name: username };
+        viewingProfile = currentUserProfile;
+        viewingUserId = currentUserProfile.id;
+        isOwner = true;
+        closeAuthModal();
+        window.location.hash = `#/${username}`;
+        await reloadCanvasData();
+        updateAuthUI();
+        if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+      } else {
+        // ── Sign in ──
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { errEl.textContent = error.message; return; }
+        closeAuthModal();
+      }
+    });
+
+    // Landing page buttons
+    landingPage.querySelector(".landing-btn--signin")?.addEventListener("click", () => openAuthModal(false));
+    landingPage.querySelector(".landing-btn--signup")?.addEventListener("click", () => openAuthModal(true));
+
+    // Hash change listener — navigate between user canvases
+    window.addEventListener("hashchange", async () => {
+      const result = await resolveRoute();
+      if (result.found) {
+        await reloadCanvasData();
+        updateAuthUI();
+        if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+      } else if (result.landing) {
+        canvas.style.display = "none";
+        searchBar.style.display = "none";
+        landingPage.style.display = "flex";
+      } else {
+        canvas.style.display = "none";
+        searchBar.style.display = "none";
+        landingPage.style.display = "flex";
+        landingPage.querySelector(".landing-subtitle").textContent =
+          `No canvas found for @${result.username}`;
+      }
+    });
+  }
   
   // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
@@ -1081,7 +1646,10 @@ async function main() {
       <div class="modalBody">
         <div class="titleRow">
           <h1 id="mTitle"></h1>
-          <button class="closeBtn" id="mClose">×</button>
+          <div class="modalActions">
+            <button class="editBtn closeBtn" id="mEdit" style="display:none" aria-label="Edit">✎</button>
+            <button class="closeBtn" id="mClose">×</button>
+          </div>
         </div>
         <div class="recipeContent" id="mRecipe">
           <div class="loading">Loading recipe...</div>
@@ -1095,6 +1663,7 @@ async function main() {
   const mTitle = overlay.querySelector("#mTitle");
   const mRecipe = overlay.querySelector("#mRecipe");
   const mClose = overlay.querySelector("#mClose");
+  const mEdit = overlay.querySelector("#mEdit");
 
   // Convert meta fields to pills
   function convertMetaFieldsToPills(container) {
@@ -1246,10 +1815,117 @@ async function main() {
     });
   }
 
+  let currentModalItem = null;
+  let isEditing = false;
+  let editorInstance = null;
+
+  // Generates an SVG data URL of a coffee bag placeholder — shape & colour vary by number
+  function makeBagSVG(name, number = 0) {
+    const w = 200, h = 300;
+    const col = BAG_PALETTE[(number + 2) % BAG_PALETTE.length];
+    const shapeIdx = number % 4;
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const gradDef = `<linearGradient id="sg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">
+        <stop offset="0"   stop-color="rgba(0,0,0,0.13)"/>
+        <stop offset="0.1" stop-color="rgba(0,0,0,0.03)"/>
+        <stop offset="0.5" stop-color="rgba(255,255,255,0.03)"/>
+        <stop offset="0.9" stop-color="rgba(0,0,0,0.03)"/>
+        <stop offset="1"   stop-color="rgba(0,0,0,0.13)"/>
+      </linearGradient>`;
+
+    const crimp = (x1, x2, sH, n) =>
+      Array.from({ length: n }, (_, i) => {
+        const ly = ((sH * (i + 1)) / (n + 1)).toFixed(1);
+        return `<line x1="${x1}" y1="${ly}" x2="${x2}" y2="${ly}" stroke="${col.crimp}" stroke-width="0.5"/>`;
+      }).join("");
+
+    let d, sealEl, extraEl = "", textBodyY;
+    let svgViewBox = `0 0 ${w} ${h}`, svgW = w;
+
+    if (shapeIdx === 0) {
+      // Four-seal bag — plain rectangle, prominent top seal
+      const cr = 5, sH = Math.round(h * 0.09);
+      d = `M${cr},0 Q0,0 0,${cr} L0,${h-cr} Q0,${h} ${cr},${h} L${w-cr},${h} Q${w},${h} ${w},${h-cr} L${w},${cr} Q${w},0 ${w-cr},0 Z`;
+      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
+      <g clip-path="url(#b)">${crimp(2, w-2, sH, 3)}</g>`;
+      textBodyY = sH;
+
+    } else if (shapeIdx === 1) {
+      // Stand-up pouch — wide top, tapers to narrower bottom
+      const ti = Math.round(w * 0.05), cr = Math.round(w * 0.03), sH = Math.round(h * 0.065);
+      d = `M0,0 L${w},0 L${w-ti},${h-cr} Q${w-ti},${h} ${w-ti-cr},${h} L${ti+cr},${h} Q${ti},${h} ${ti},${h-cr} Z`;
+      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
+      <g clip-path="url(#b)">${crimp(2, w-2, sH, 4)}</g>`;
+      textBodyY = sH;
+
+    } else if (shapeIdx === 2) {
+      // Flat-bottom pouch — simple rounded rectangle with full-width seal
+      const cr = 5, sH = Math.round(h * 0.09);
+      d = `M${cr},0 Q0,0 0,${cr} L0,${h-cr} Q0,${h} ${cr},${h} L${w-cr},${h} Q${w},${h} ${w},${h-cr} L${w},${cr} Q${w},0 ${w-cr},0 Z`;
+      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
+      <g clip-path="url(#b)">${crimp(2, w-2, sH, 3)}</g>`;
+      textBodyY = sH;
+
+    } else {
+      // Side-fold bag — narrow top, widens toward the bottom (inverse of stand-up pouch)
+      const ti = Math.round(w * 0.05), cr = 5, sH = Math.round(h * 0.065);
+      d = `M${ti},0 L${w-ti},0 L${w},${h-cr} Q${w},${h} ${w-cr},${h} L${cr},${h} Q0,${h} 0,${h-cr} Z`;
+      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
+      <g clip-path="url(#b)">${crimp(ti+2, w-ti-2, sH, 3)}</g>`;
+      textBodyY = sH;
+    }
+
+    // Word-wrap name
+    const fontSize = 15, lineH = fontSize * 1.4;
+    const maxChars = Math.floor((w - 48) / (fontSize * 0.56));
+    const words = (name || "").split(" ");
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? line + " " + word : word;
+      if (test.length > maxChars && line) { lines.push(line); line = word; } else { line = test; }
+    }
+    if (line) lines.push(line);
+    const totalH = lines.length * lineH;
+    const textStartY = textBodyY + (h - textBodyY) / 2 - totalH / 2 + lineH / 2;
+    const textEls = lines.map((l, i) =>
+      `<text x="${w/2}" y="${Math.round(textStartY + i*lineH)}" text-anchor="middle" dominant-baseline="middle" fill="${col.text}" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="${fontSize}" font-weight="500">${esc(l)}</text>`
+    ).join("");
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${h}" viewBox="${svgViewBox}">
+      <defs><clipPath id="b"><path d="${d}"/></clipPath>${gradDef}</defs>
+      <path d="${d}" fill="${col.body}"/>
+      <rect x="0" y="0" width="${w}" height="${h}" fill="url(#sg)" clip-path="url(#b)"/>
+      ${sealEl}
+      <path d="${d}" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
+      ${extraEl}
+      ${textEls}
+    </svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
   async function openModal(it) {
-    mImg.src = it.img;
+    currentModalItem = it;
+
+    // Restore view-mode modal structure if editor was active
+    const editorView = modalEl.querySelector(".editor-view");
+    if (editorView) {
+      editorView.remove();
+      const mediaEl = modalEl.querySelector(".modalMedia");
+      const bodyEl = modalEl.querySelector(".modalBody");
+      if (mediaEl) mediaEl.style.display = "";
+      if (bodyEl) bodyEl.style.display = "";
+    }
+
+    mImg.onerror = () => {
+      mImg.onerror = null;
+      mImg.src = makeBagSVG(it.name, it.number);
+    };
+    mImg.src = it.img || makeBagSVG(it.name, it.number);
     mImg.alt = it.name ? `${it.name} bag` : `Coffee bag ${it.number}`;
-    mTitle.textContent = "";
+    mTitle.textContent = it.name || "";
+    mEdit.style.display = hasSupabase && authSession && isOwner && it.id ? "flex" : "none";
 
     mRecipe.innerHTML = '<div class="loading">Loading recipe...</div>';
     overlay.classList.add("open");
@@ -1258,50 +1934,63 @@ async function main() {
     overlay.style.opacity = "1";
     overlay.style.zIndex = "2000";
     renderPaused = true;
-    
+
     const modalBody = overlay.querySelector(".modalBody");
     if (modalBody) modalBody.scrollTop = 0;
-    
+
     try {
-      const recipePath = `/recipes/coffee-${pad2(it.number)}.md`;
-      const response = await fetch(recipePath, { cache: "default" });
-      
-      if (response.ok) {
-        const markdown = await response.text();
+      // Build metadata pills from item fields
+      const hasItemMeta = it.tags?.length || it.rating || it.brewer?.length || it.grinder?.length || it.notes?.length;
+      let metaHtml = "";
+      if (hasItemMeta) {
+        if (it.tags?.length) {
+          metaHtml += `<div class="tagsWrapper"><span>Type: </span><span class="pillRow">${it.tags.map(t => `<span class="pill">${escapeHtml(t)}</span>`).join("")}</span></div>`;
+        }
+        if (it.rating) {
+          metaHtml += `<div class="tagsWrapper"><span>Rating: </span><span class="pill">${"\u2605".repeat(it.rating)}${"\u2606".repeat(5 - it.rating)}</span></div>`;
+        }
+        if (it.brewer?.length) {
+          metaHtml += `<div class="tagsWrapper"><span>Brewer: </span><span class="pillRow">${it.brewer.map(b => `<span class="pill">${escapeHtml(b)}</span>`).join("")}</span></div>`;
+        }
+        if (it.grinder?.length) {
+          metaHtml += `<div class="tagsWrapper"><span>Grinder: </span><span class="pillRow">${it.grinder.map(g => `<span class="pill">${escapeHtml(g)}</span>`).join("")}</span></div>`;
+        }
+        if (it.notes?.length) {
+          metaHtml += `<div class="tagsWrapper"><span>Tasting Notes: </span><span class="pillRow">${it.notes.map(n => `<span class="pill">${escapeHtml(n)}</span>`).join("")}</span></div>`;
+        }
+      }
+
+      // Get recipe markdown
+      let markdown = it.recipe_body;
+      if (!markdown) {
+        const recipePath = `/recipes/coffee-${pad2(it.number)}.md`;
+        const response = await fetch(recipePath, { cache: "default" });
+        if (response.ok) markdown = await response.text();
+        else {
+          const altResponse = await fetch(`/src/data/recipes/coffee-${pad2(it.number)}.md`);
+          if (altResponse.ok) markdown = await altResponse.text();
+        }
+      }
+
+      if (hasItemMeta && markdown) {
+        // Render metadata from item fields + recipe body from markdown
+        const recipeBody = extractRecipeContent(markdown);
+        const recipeHtml = recipeBody ? parseMarkdown(recipeBody) : "";
+        mRecipe.innerHTML = metaHtml + recipeHtml;
+      } else if (markdown) {
+        // Fallback: parse everything from markdown (legacy/static behavior)
         const html = parseMarkdown(markdown);
-        
         const tempDiv = document.createElement("div");
         tempDiv.innerHTML = html;
         const h1 = tempDiv.querySelector("h1");
-        
         if (h1) {
-          mTitle.textContent = h1.textContent;
+          if (!mTitle.textContent) mTitle.textContent = h1.textContent;
           h1.remove();
         }
-        
         convertMetaFieldsToPills(tempDiv);
         mRecipe.innerHTML = tempDiv.innerHTML;
       } else {
-        const altPath = `/src/data/recipes/coffee-${pad2(it.number)}.md`;
-        const altResponse = await fetch(altPath);
-        if (altResponse.ok) {
-          const markdown = await altResponse.text();
-          const html = parseMarkdown(markdown);
-          
-          const tempDiv = document.createElement("div");
-          tempDiv.innerHTML = html;
-          const h1 = tempDiv.querySelector("h1");
-          
-          if (h1) {
-            mTitle.textContent = h1.textContent;
-            h1.remove();
-          }
-          
-          convertMetaFieldsToPills(tempDiv);
-          mRecipe.innerHTML = tempDiv.innerHTML;
-        } else {
-          mRecipe.innerHTML = '<div class="no-recipe">No recipe available for this coffee.</div>';
-        }
+        mRecipe.innerHTML = metaHtml || '<div class="no-recipe">No recipe available for this coffee.</div>';
       }
     } catch (error) {
       console.error("Error loading recipe:", error);
@@ -1310,19 +1999,138 @@ async function main() {
   }
 
   function closeModal() {
+    isEditing = false;
+    editorInstance = null;
+    const editorView = overlay.querySelector(".editor-view");
+    if (editorView) {
+      editorView.remove();
+      const mediaEl = overlay.querySelector(".modalMedia");
+      const bodyEl = overlay.querySelector(".modalBody");
+      if (mediaEl) mediaEl.style.display = "";
+      if (bodyEl) bodyEl.style.display = "";
+    }
     overlay.classList.remove("open");
     overlay.style.display = "none";
     overlay.style.visibility = "hidden";
     renderPaused = false;
   }
 
-  mClose.addEventListener("click", closeModal);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeModal();
+  mClose.addEventListener("click", () => {
+    if (isEditing && editorInstance?.cancel) {
+      editorInstance.cancel();
+      return;
+    }
+    closeModal();
   });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      if (isEditing && editorInstance?.cancel) {
+        editorInstance.cancel();
+        return;
+      }
+      closeModal();
+    }
+  });
+
+  // Editor mode
+  const modalEl = overlay.querySelector(".modal");
+
+  async function openEditor(item) {
+    if (!hasSupabase || !authSession) return;
+    const { createCoffeeEditor } = await import("./editor.js");
+    isEditing = true;
+    const isNew = !item;
+
+    overlay.classList.add("open");
+    overlay.style.display = "flex";
+    overlay.style.visibility = "visible";
+    overlay.style.opacity = "1";
+    overlay.style.zIndex = "2000";
+    renderPaused = true;
+
+    const suggestions = {
+      type: [...new Set(baseItems.flatMap((i) => i.tags || []))].sort(),
+      brewer: [...new Set(baseItems.flatMap((i) => i.brewer || []))].sort(),
+      grinder: [...new Set(baseItems.flatMap((i) => i.grinder || []))].sort(),
+      tastingNotes: [...new Set(baseItems.flatMap((i) => i.notes || []))].sort(),
+    };
+
+    editorInstance = createCoffeeEditor(modalEl, {
+      item,
+      supabase,
+      pad2,
+      suggestions,
+      userId: viewingUserId,
+      placeholderSrc: makeBagSVG(item?.name, item?.number),
+      onSave: async (savedItem) => {
+        if (isNew) {
+          baseItems.push(savedItem);
+        } else {
+          const idx = baseItems.findIndex((i) => i.number === savedItem.number);
+          if (idx >= 0) baseItems[idx] = savedItem;
+        }
+
+        // Load and cache image BEFORE recalculating layout (always call — handles empty src for placeholder)
+        await loadImageToCache(savedItem.number, savedItem.img);
+
+        filteredBaseItems = baseItems;
+        duplicatedItems = createDuplicatedItems(filteredBaseItems);
+        tileItems = createTileLayout();
+        hoveredItem = null;
+        lastHoveredItem = null;
+        emptyCanvasOverlay.style.display = "none";
+
+        isEditing = false;
+        editorInstance = null;
+        currentModalItem = savedItem;
+        openModal(savedItem);
+      },
+      onCancel: () => {
+        isEditing = false;
+        editorInstance = null;
+        if (item) {
+          openModal(item);
+        } else {
+          closeModal();
+        }
+      },
+      onDelete: (deletedItem) => {
+        isEditing = false;
+        editorInstance = null;
+        const idx = baseItems.findIndex((i) => i.number === deletedItem.number);
+        if (idx >= 0) baseItems.splice(idx, 1);
+        filteredBaseItems = baseItems;
+        duplicatedItems = createDuplicatedItems(filteredBaseItems);
+        tileItems = createTileLayout();
+        imageCache.delete(deletedItem.number);
+        closeModal();
+      },
+    });
+  }
+
+  mEdit.addEventListener("click", () => openEditor(currentModalItem));
+
+  // Add-new button
+  const addBtn = document.createElement("button");
+  addBtn.className = "add-coffee-btn";
+  addBtn.type = "button";
+  addBtn.textContent = "+";
+  addBtn.setAttribute("aria-label", "Add new coffee");
+  addBtn.style.display = hasSupabase && authSession && isOwner ? "flex" : "none";
+  searchBar.querySelector(".search-row").appendChild(addBtn);
+  addBtn.addEventListener("click", () => openEditor(null));
+  addBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+  addBtn.addEventListener("touchstart", (e) => e.stopPropagation());
+
+  function updateAddBtnVisibility() {
+    addBtn.style.display = hasSupabase && authSession && isOwner ? "flex" : "none";
+  }
+
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (filterOverlay.classList.contains("open")) {
+      if (isEditing) {
+        if (editorInstance?.cancel) editorInstance.cancel();
+      } else if (filterOverlay.classList.contains("open")) {
         filterOverlay.classList.remove("open");
         filterOverlay.style.display = "none";
         filterOverlay.style.visibility = "hidden";

@@ -4,11 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate": "node scripts/migrate-to-supabase.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "@tiptap/core": "^3.20.1",
+    "@tiptap/markdown": "^3.20.1",
+    "@tiptap/pm": "^3.20.1",
+    "@tiptap/starter-kit": "^3.20.1"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "vite": "^7.2.4"
   }
 }

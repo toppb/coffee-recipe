@@ -17,6 +17,16 @@ A beautiful, interactive coffee recipe website featuring an infinite scrollable 
 - **Active Filter Indicator**: A dot on the filter button shows when filters are applied.
 - **No Match State**: When no results match, a "Show all" button resets search and filters.
 
+### V3 – Editable Metadata (Supabase)
+
+- **Inline Editing**: When using Supabase, sign in to edit coffee metadata directly in the app.
+- **Editable Fields**: Name, rating, tags, roaster, origin, process, tasting notes, brewer, grinder, recipe markdown, and bag image.
+- **Image Upload**: Replace coffee bag images via the edit form; images are stored in Supabase Storage.
+- **Single Admin**: One authenticated user can edit; sign-up can be disabled for a personal recipe app.
+- **Fallback**: Without Supabase configuration, the app works with static JSON and recipe files as before.
+
+See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for setup instructions.
+
 ### Core Features
 
 - **Infinite Grid Layout**: Seamlessly scrollable masonry grid with drag-to-explore navigation
@@ -56,6 +66,13 @@ npm run dev
 
 4. Open your browser and navigate to `http://localhost:5173`
 
+### Optional: Enable Editable Metadata (Supabase)
+
+1. Create a Supabase project and follow [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+2. Copy `.env.example` to `.env` and add your `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+3. Run `npm run migrate` to seed data (requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`).
+4. Sign in via the "Sign in" button to edit coffee metadata.
+
 ## 📦 Building for Production
 
 To create a production build:
@@ -78,6 +95,10 @@ coffee-grid/
 │   ├── bags/          # Coffee bag images (coffee-bag-01.png, etc.)
 │   ├── data/          # coffee.json - metadata (name, tags, rating, etc.)
 │   └── recipes/       # Markdown recipe files (coffee-01.md, etc.)
+├── supabase/
+│   └── migrations/    # SQL schema for Supabase
+├── scripts/
+│   └── migrate-to-supabase.js   # One-time migration script
 ├── src/
 │   ├── data/
 │   │   └── coffee.json    # Coffee metadata (names, tags, etc.)
@@ -118,6 +139,7 @@ coffee-grid/
 ## 🛠️ Technologies Used
 
 - **Vite** - Build tool and dev server
+- **Supabase** - Database, auth, and storage (optional)
 - **Vanilla JavaScript** - No frameworks, pure JS
 - **CSS3** - Modern CSS with GPU-accelerated transforms
 - **Markdown** - Recipe content format
@@ -133,7 +155,7 @@ coffee-grid/
 
 This project can be easily deployed to:
 
-- **Vercel**: Connect your GitHub repo for automatic deployments
+- **Vercel**: Connect your GitHub repo for automatic deployments. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in project settings if using Supabase.
 - **Netlify**: Drag & drop the `dist` folder or connect via Git
 - **GitHub Pages**: Enable Pages in repo settings, set source to `dist` folder
 - **Cloudflare Pages**: Connect repository and set build command to `npm run build`
