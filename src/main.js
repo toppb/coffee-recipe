@@ -1310,13 +1310,13 @@ async function main() {
   authOverlay.innerHTML = `
     <div class="modal auth-modal">
       <h2 class="auth-title" id="authTitle">Sign in</h2>
-      <form class="auth-form" id="authForm">
+      <form class="auth-form" id="authForm" novalidate>
         <input type="text" name="username" placeholder="Username" class="auth-input auth-username-input"
                pattern="[a-z0-9][a-z0-9_\\-]{1,28}[a-z0-9]" autocomplete="username"
                autocapitalize="none" autocorrect="off" spellcheck="false"
                style="display:none" />
-        <input type="email" name="email" placeholder="Email" required class="auth-input" autocomplete="email" />
-        <input type="password" name="password" placeholder="Password" required class="auth-input" autocomplete="current-password" />
+        <input type="email" name="email" placeholder="Email" class="auth-input" autocomplete="username" />
+        <input type="password" name="password" placeholder="Password" class="auth-input" autocomplete="current-password" />
         <button type="submit" class="auth-submit" id="authSubmitBtn">Sign in</button>
       </form>
       <p class="auth-toggle">
@@ -1348,6 +1348,7 @@ async function main() {
     link.textContent = signUp ? "Sign in" : "Sign up";
     usernameInput.style.display = signUp ? "" : "none";
     usernameInput.required = signUp;
+    authOverlay.querySelector('[name="password"]').autocomplete = signUp ? "new-password" : "current-password";
     authOverlay.querySelector("#authError").textContent = "";
   }
 
@@ -1442,8 +1443,13 @@ async function main() {
       const errEl = authOverlay.querySelector("#authError");
       errEl.textContent = "";
 
-      const email = e.target.querySelector('[name="email"]').value;
+      const email = e.target.querySelector('[name="email"]').value.trim();
       const password = e.target.querySelector('[name="password"]').value;
+
+      if (!email || !password) {
+        errEl.textContent = "Please enter your email and password.";
+        return;
+      }
 
       if (authIsSignUp) {
         // ── Sign up ──
