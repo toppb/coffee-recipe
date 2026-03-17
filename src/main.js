@@ -1393,11 +1393,18 @@ async function main() {
         }
         closeAuthModal();
         if (currentUserProfile && viewingUserId !== currentUserProfile.id) {
-          viewingProfile = currentUserProfile;
-          viewingUserId = currentUserProfile.id;
-          isOwner = true;
-          history.pushState({}, '', `/${currentUserProfile.username}`);
-          await reloadCanvasData();
+          const routeUsername = getRouteUsername();
+          if (routeUsername && routeUsername !== currentUserProfile.username) {
+            // Viewing another user's canvas — keep it, just update auth state
+            isOwner = false;
+          } else {
+            // On landing page or no route — redirect to own canvas
+            viewingProfile = currentUserProfile;
+            viewingUserId = currentUserProfile.id;
+            isOwner = true;
+            history.pushState({}, '', `/${currentUserProfile.username}`);
+            await reloadCanvasData();
+          }
         }
       } else {
         currentUserProfile = null;
