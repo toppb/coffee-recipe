@@ -349,6 +349,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
     if (file) {
       const url = URL.createObjectURL(file);
       imgEl.src = url;
+      imgEl.style.display = "";
       imgSection.classList.remove("editor-image--empty");
       imgOverlay.textContent = "Change image";
     }
