@@ -2142,8 +2142,30 @@ async function main() {
   addBtn.addEventListener("mousedown", (e) => e.stopPropagation());
   addBtn.addEventListener("touchstart", (e) => e.stopPropagation());
 
+  // Home button — navigate to own canvas when viewing someone else's
+  const homeBtn = document.createElement("button");
+  homeBtn.className = "home-canvas-btn";
+  homeBtn.type = "button";
+  homeBtn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+  homeBtn.setAttribute("aria-label", "Go to my canvas");
+  homeBtn.style.display = "none";
+  searchBar.querySelector(".search-row").appendChild(homeBtn);
+  homeBtn.addEventListener("click", () => {
+    if (currentUserProfile) {
+      history.pushState({}, '', `/${currentUserProfile.username}`);
+      viewingProfile = currentUserProfile;
+      viewingUserId = currentUserProfile.id;
+      isOwner = true;
+      reloadCanvasData();
+      updateAddBtnVisibility();
+    }
+  });
+  homeBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+  homeBtn.addEventListener("touchstart", (e) => e.stopPropagation());
+
   function updateAddBtnVisibility() {
     addBtn.style.display = hasSupabase && authSession && isOwner ? "flex" : "none";
+    homeBtn.style.display = hasSupabase && authSession && !isOwner ? "flex" : "none";
   }
 
   window.addEventListener("keydown", (e) => {
