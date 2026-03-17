@@ -1347,26 +1347,23 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   height: 56px;
   padding: 0;
   border: none;
-  background: rgba(255,255,255,.85);
+  background: rgba(0,0,0,.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 50%;
   font-size: 26px;
   font-weight: 300;
-  color: rgba(0,0,0,.6);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.04);
+  box-shadow: 0 4px 20px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06);
   font-family: inherit;
   line-height: 1;
-  transition: box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 .add-coffee-btn:hover{
-  background: rgba(255,255,255,.95);
-  color: rgba(0,0,0,.8);
-  box-shadow: 0 6px 28px rgba(0,0,0,.16), 0 0 0 2px rgba(0,0,0,.08);
+  background: rgba(0,0,0,.92);
 }
 
 /* Home canvas button */
