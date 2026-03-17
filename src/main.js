@@ -1975,7 +1975,7 @@ async function main() {
 
       // Get recipe markdown
       let markdown = it.recipe_body;
-      if (!markdown) {
+      if (!markdown && !it.id) {
         const recipePath = `/recipes/coffee-${pad2(it.number)}.md`;
         const response = await fetch(recipePath, { cache: "default" });
         if (response.ok) markdown = await response.text();
