@@ -1439,16 +1439,15 @@ async function main() {
     // Form submit — sign in or sign up
     authOverlay.querySelector("#authForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const fd = new FormData(e.target);
       const errEl = authOverlay.querySelector("#authError");
       errEl.textContent = "";
 
-      const email = fd.get("email");
-      const password = fd.get("password");
+      const email = e.target.querySelector('[name="email"]').value;
+      const password = e.target.querySelector('[name="password"]').value;
 
       if (authIsSignUp) {
         // ── Sign up ──
-        const username = fd.get("username")?.toLowerCase().trim();
+        const username = e.target.querySelector('[name="username"]').value?.toLowerCase().trim();
         if (!username || !/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username)) {
           errEl.textContent = "Username must be 3\u201330 characters: lowercase letters, numbers, hyphens, underscores.";
           return;

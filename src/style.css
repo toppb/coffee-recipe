@@ -912,6 +912,21 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 .auth-toggle a:hover{
   text-decoration: underline;
 }
+@media (max-width: 760px) {
+  .auth-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+  .auth-modal {
+    height: auto !important;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    width: min(360px, 100%);
+  }
+  .auth-input {
+    font-size: 16px; /* prevent iOS auto-zoom on input focus */
+  }
+}
 
 /* Landing page */
 .landing-page{
