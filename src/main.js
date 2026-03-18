@@ -1310,6 +1310,13 @@ async function main() {
   authOverlay.innerHTML = `
     <div class="modal auth-modal">
       <h2 class="auth-title" id="authTitle">Sign in</h2>
+      <div class="auth-oauth-buttons">
+        <button type="button" class="auth-oauth-btn" data-provider="google">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 010-9.18l-7.98-6.19a24.08 24.08 0 000 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continue with Google
+        </button>
+      </div>
+      <div class="auth-divider"><span>or</span></div>
       <form class="auth-form" id="authForm" novalidate>
         <input type="text" name="username" placeholder="Username" class="auth-input auth-username-input"
                pattern="[a-z0-9][a-z0-9_\\-]{1,28}[a-z0-9]" autocomplete="username"
@@ -1327,6 +1334,86 @@ async function main() {
     </div>
   `;
   document.body.appendChild(authOverlay);
+
+  // ── Username picker overlay (for first-time OAuth users) ──
+  const usernamePickerOverlay = document.createElement("div");
+  usernamePickerOverlay.className = "overlay auth-overlay";
+  usernamePickerOverlay.style.display = "none";
+  usernamePickerOverlay.innerHTML = `
+    <div class="modal auth-modal">
+      <h2 class="auth-title">Choose a username</h2>
+      <p class="username-picker-subtitle">Pick a username for your canvas URL</p>
+      <form class="auth-form" id="usernamePickerForm" novalidate>
+        <input type="text" name="pickerUsername" placeholder="Username" class="auth-input"
+               autocapitalize="none" autocorrect="off" spellcheck="false" />
+        <button type="submit" class="auth-submit">Claim username</button>
+      </form>
+      <p class="auth-error" id="usernamePickerError"></p>
+    </div>
+  `;
+  document.body.appendChild(usernamePickerOverlay);
+
+  // Auto-lowercase username picker input
+  usernamePickerOverlay.querySelector('[name="pickerUsername"]').addEventListener("input", (e) => {
+    const pos = e.target.selectionStart;
+    e.target.value = e.target.value.toLowerCase();
+    e.target.setSelectionRange(pos, pos);
+  });
+
+  let pendingOAuthUserId = null;
+
+  function openUsernamePicker(userId) {
+    pendingOAuthUserId = userId;
+    closeAuthModal();
+    usernamePickerOverlay.style.display = "flex";
+    usernamePickerOverlay.style.visibility = "visible";
+    usernamePickerOverlay.style.opacity = "1";
+    usernamePickerOverlay.style.zIndex = "2000";
+  }
+
+  function closeUsernamePicker() {
+    usernamePickerOverlay.style.display = "none";
+    usernamePickerOverlay.querySelector("#usernamePickerForm").reset();
+    usernamePickerOverlay.querySelector("#usernamePickerError").textContent = "";
+    pendingOAuthUserId = null;
+  }
+
+  // Username picker form submit
+  usernamePickerOverlay.querySelector("#usernamePickerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = usernamePickerOverlay.querySelector("#usernamePickerError");
+    errEl.textContent = "";
+    const username = e.target.querySelector('[name="pickerUsername"]').value?.toLowerCase().trim();
+    if (!username || !/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username)) {
+      errEl.textContent = "Username must be 3\u201330 characters: lowercase letters, numbers, hyphens, underscores.";
+      return;
+    }
+    // Check availability
+    const { data: existing } = await supabase
+      .from("profiles").select("id").eq("username", username).single();
+    if (existing) { errEl.textContent = "Username already taken."; return; }
+
+    // Create profile
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .insert({ id: pendingOAuthUserId, username, display_name: username });
+    if (profileErr) { errEl.textContent = profileErr.message; return; }
+
+    currentUserProfile = { id: pendingOAuthUserId, username, display_name: username };
+    viewingProfile = currentUserProfile;
+    viewingUserId = currentUserProfile.id;
+    isOwner = true;
+    closeUsernamePicker();
+    history.pushState({}, '', `/${username}`);
+    await reloadCanvasData();
+    updateAuthUI();
+    if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+  });
+
+  // Close username picker on backdrop click
+  usernamePickerOverlay.addEventListener("click", (e) => {
+    if (e.target === usernamePickerOverlay) closeUsernamePicker();
+  });
 
   const authBtn = document.createElement("button");
   authBtn.className = "auth-btn";
@@ -1392,6 +1479,11 @@ async function main() {
           currentUserProfile = await getProfileByUserId(session.user.id);
         }
         closeAuthModal();
+        // OAuth user with no profile yet — show username picker
+        if (!currentUserProfile) {
+          openUsernamePicker(session.user.id);
+          return;
+        }
         if (currentUserProfile && viewingUserId !== currentUserProfile.id) {
           const routeUsername = getRouteUsername();
           if (routeUsername && routeUsername !== currentUserProfile.username) {
@@ -1442,6 +1534,16 @@ async function main() {
     authOverlay.querySelector("#authToggleLink").addEventListener("click", (e) => {
       e.preventDefault();
       setAuthMode(!authIsSignUp);
+    });
+
+    // OAuth buttons
+    authOverlay.querySelectorAll(".auth-oauth-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        supabase.auth.signInWithOAuth({
+          provider: btn.dataset.provider,
+          options: { redirectTo: window.location.origin },
+        });
+      });
     });
 
     // Form submit — sign in or sign up

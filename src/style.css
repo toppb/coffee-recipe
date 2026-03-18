@@ -912,6 +912,58 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 .auth-toggle a:hover{
   text-decoration: underline;
 }
+/* OAuth buttons */
+.auth-oauth-buttons{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.auth-oauth-btn{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  background: #fff;
+  color: rgba(0,0,0,0.8);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.auth-oauth-btn:hover{
+  background: rgba(0,0,0,0.03);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.auth-oauth-btn svg{
+  flex-shrink: 0;
+}
+.auth-divider{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  color: rgba(0,0,0,0.35);
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after{
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(0,0,0,0.1);
+}
+/* Username picker subtitle */
+.username-picker-subtitle{
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: rgba(0,0,0,0.5);
+}
 @media (max-width: 760px) {
   .auth-overlay {
     align-items: center;
