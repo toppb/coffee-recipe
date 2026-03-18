@@ -1346,7 +1346,7 @@ async function main() {
       <form class="auth-form" id="usernamePickerForm" novalidate>
         <input type="text" name="pickerUsername" placeholder="Username" class="auth-input"
                autocapitalize="none" autocorrect="off" spellcheck="false" />
-        <button type="submit" class="auth-submit">Claim username</button>
+        <button type="submit" class="auth-submit">Let's go</button>
       </form>
       <p class="auth-error" id="usernamePickerError"></p>
     </div>
