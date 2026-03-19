@@ -1,8 +1,10 @@
 import "./style.css";
 import { inject } from "@vercel/analytics";
+import { injectSpeedInsights } from "@vercel/speed-insights";
 import { supabase, hasSupabase } from "./supabase.js";
 
 inject();
+injectSpeedInsights();
 
 // Simple markdown parser
 function parseMarkdown(md) {
