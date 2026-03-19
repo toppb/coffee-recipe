@@ -1,5 +1,8 @@
 import "./style.css";
+import { inject } from "@vercel/analytics";
 import { supabase, hasSupabase } from "./supabase.js";
+
+inject();
 
 // Simple markdown parser
 function parseMarkdown(md) {
