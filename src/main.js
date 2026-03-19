@@ -204,8 +204,15 @@ async function main() {
   if (routeResult.found && hasSupabase) {
     rawData = await loadCoffeesForUser(viewingUserId);
     fromSupabase = true;
-  } else if (!hasSupabase || routeResult.landing) {
-    // Static demo data: used in dev mode and as landing page background grid
+  } else if (routeResult.landing && hasSupabase) {
+    // Landing background: load featured user's coffees
+    const featured = await getProfileByUsername("toppbrocales");
+    if (featured) {
+      rawData = await loadCoffeesForUser(featured.id);
+      fromSupabase = true;
+    }
+  } else if (!hasSupabase) {
+    // Static demo data for dev mode
     const res = await fetch("/data/coffee.json", { cache: "default" });
     rawData = await res.json();
   }
