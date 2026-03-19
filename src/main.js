@@ -1541,15 +1541,27 @@ async function main() {
     // Auth button — log out or open sign-in modal
     authBtn.addEventListener("click", async () => {
       if (authSession) {
-        // Show landing first so updateAuthUI (fired by signOut) hides the button
-        canvas.style.display = "none";
+        // Show landing with background grid
         searchBar.style.display = "none";
         landingPage.style.display = "flex";
         landingPage.querySelector(".landing-subtitle").textContent =
           "Your personal canvas of coffee recipes";
+        landingPage.querySelector(".landing-card").style.display = "";
         authBtn.style.display = "none";
         await supabase.auth.signOut();
         history.pushState({}, '', '/');
+        // Reload featured user's coffees as background
+        const featured = await getProfileByUsername("toppbrocales");
+        if (featured) {
+          const coffeesData = await loadCoffeesForUser(featured.id);
+          baseItems = coffeesData.map((d) => {
+            const number = Number(d.number);
+            return { ...d, number, img: d.img || imgFor(number) };
+          });
+          duplicatedItems = createDuplicatedItems(baseItems);
+          await Promise.all(baseItems.map((item) => loadImageToCache(item.number, item.img)));
+          tileItems = createTileLayout();
+        }
       } else {
         openAuthModal(false);
       }
@@ -1720,9 +1732,9 @@ async function main() {
         updateAuthUI();
         if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
       } else if (result.landing) {
-        canvas.style.display = "none";
         searchBar.style.display = "none";
         landingPage.style.display = "flex";
+        landingPage.querySelector(".landing-card").style.display = "";
       } else {
         canvas.style.display = "none";
         searchBar.style.display = "none";
