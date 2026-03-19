@@ -987,53 +987,43 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F6F0E6;
+  background: rgba(0,0,0,0.15);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   z-index: 10;
 }
 .landing-content{
   text-align: center;
-  max-width: 420px;
-  padding: 32px;
+  max-width: 400px;
+  width: calc(100% - 48px);
 }
 .landing-title{
-  font-size: 36px;
-  font-weight: 600;
-  margin: 0 0 12px;
-  color: #1b1b1b;
+  font-size: 42px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 .landing-subtitle{
-  font-size: 17px;
-  color: rgba(0,0,0,0.5);
-  margin: 0 0 32px;
+  font-size: 16px;
+  color: rgba(255,255,255,0.85);
+  margin: 0 0 28px;
   line-height: 1.5;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.3);
 }
-.landing-buttons{
-  display: flex;
-  gap: 12px;
-  justify-content: center;
+.landing-card{
+  background: rgba(255,255,255,0.97);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  text-align: left;
 }
-.landing-btn{
-  padding: 12px 28px;
-  border: none;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-}
-.landing-btn--signup{
-  background: rgba(0,0,0,0.85);
-  color: #fff;
-}
-.landing-btn--signup:hover{
-  background: rgba(0,0,0,0.95);
-}
-.landing-btn--signin{
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.7);
-}
-.landing-btn--signin:hover{
-  background: rgba(0,0,0,0.1);
+.landing-card-title{
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: #1b1b1b;
+  text-align: left;
 }
 
 /* Editor view */

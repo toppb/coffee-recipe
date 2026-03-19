@@ -204,7 +204,8 @@ async function main() {
   if (routeResult.found && hasSupabase) {
     rawData = await loadCoffeesForUser(viewingUserId);
     fromSupabase = true;
-  } else if (!hasSupabase) {
+  } else if (!hasSupabase || routeResult.landing) {
+    // Static demo data: used in dev mode and as landing page background grid
     const res = await fetch("/data/coffee.json", { cache: "default" });
     rawData = await res.json();
   }
@@ -238,11 +239,30 @@ async function main() {
   landingPage.className = "landing-page";
   landingPage.innerHTML = `
     <div class="landing-content">
-      <h1 class="landing-title">Coffee Recipes</h1>
+      <h1 class="landing-title">Brewist</h1>
       <p class="landing-subtitle">Your personal canvas of coffee recipes</p>
-      <div class="landing-buttons">
-        <button class="landing-btn landing-btn--signup" type="button">Sign up</button>
-        <button class="landing-btn landing-btn--signin" type="button">Sign in</button>
+      <div class="landing-card">
+        <h2 class="landing-card-title" id="landingAuthTitle">Sign up</h2>
+        <div class="auth-oauth-buttons">
+          <button type="button" class="auth-oauth-btn landing-oauth-btn" data-provider="google">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 010-9.18l-7.98-6.19a24.08 24.08 0 000 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            Continue with Google
+          </button>
+        </div>
+        <div class="auth-divider"><span>or</span></div>
+        <form class="auth-form" id="landingAuthForm" novalidate>
+          <input type="text" name="username" placeholder="Username" class="auth-input auth-username-input"
+                 pattern="[a-z0-9][a-z0-9_\\-]{1,28}[a-z0-9]" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false" />
+          <input type="email" name="email" placeholder="Email" class="auth-input" autocomplete="username" />
+          <input type="password" name="password" placeholder="Password" class="auth-input" autocomplete="new-password" />
+          <button type="submit" class="auth-submit" id="landingAuthSubmitBtn">Sign up</button>
+        </form>
+        <p class="auth-toggle">
+          <span id="landingToggleText">Already have an account?</span>
+          <a href="#" id="landingToggleLink">Sign in</a>
+        </p>
+        <p class="auth-error" id="landingAuthError"></p>
       </div>
     </div>
   `;
@@ -250,13 +270,15 @@ async function main() {
 
   const isLanding = routeResult.landing === true;
   const isNotFound = !routeResult.found && !routeResult.landing;
-  if (isLanding || isNotFound) {
+  if (isLanding) {
+    // Show grid behind landing overlay (canvas stays visible)
+    landingPage.style.display = "flex";
+  } else if (isNotFound) {
     canvas.style.display = "none";
     landingPage.style.display = "flex";
-    if (isNotFound) {
-      landingPage.querySelector(".landing-subtitle").textContent =
-        `No canvas found for @${routeResult.username}`;
-    }
+    landingPage.querySelector(".landing-subtitle").textContent =
+      `No canvas found for @${routeResult.username}`;
+    landingPage.querySelector(".landing-card").style.display = "none";
   } else {
     landingPage.style.display = "none";
   }
@@ -1479,6 +1501,7 @@ async function main() {
           currentUserProfile = await getProfileByUserId(session.user.id);
         }
         closeAuthModal();
+        landingPage.style.display = "none";
         // OAuth user with no profile yet — show username picker
         if (!currentUserProfile) {
           openUsernamePicker(session.user.id);
@@ -1600,9 +1623,87 @@ async function main() {
       }
     });
 
-    // Landing page buttons
-    landingPage.querySelector(".landing-btn--signin")?.addEventListener("click", () => openAuthModal(false));
-    landingPage.querySelector(".landing-btn--signup")?.addEventListener("click", () => openAuthModal(true));
+    // ── Landing page form handlers ──
+    let landingIsSignUp = true;
+
+    // Auto-lowercase landing username input
+    landingPage.querySelector('[name="username"]').addEventListener("input", (e) => {
+      const pos = e.target.selectionStart;
+      e.target.value = e.target.value.toLowerCase();
+      e.target.setSelectionRange(pos, pos);
+    });
+
+    // Landing toggle
+    landingPage.querySelector("#landingToggleLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      landingIsSignUp = !landingIsSignUp;
+      const title = landingPage.querySelector("#landingAuthTitle");
+      const submit = landingPage.querySelector("#landingAuthSubmitBtn");
+      const toggle = landingPage.querySelector("#landingToggleText");
+      const link = landingPage.querySelector("#landingToggleLink");
+      const usernameInput = landingPage.querySelector('[name="username"]');
+      const passwordInput = landingPage.querySelector('[name="password"]');
+      title.textContent = landingIsSignUp ? "Sign up" : "Sign in";
+      submit.textContent = landingIsSignUp ? "Sign up" : "Sign in";
+      toggle.textContent = landingIsSignUp ? "Already have an account?" : "Don\u2019t have an account?";
+      link.textContent = landingIsSignUp ? "Sign in" : "Sign up";
+      usernameInput.style.display = landingIsSignUp ? "" : "none";
+      usernameInput.required = landingIsSignUp;
+      passwordInput.autocomplete = landingIsSignUp ? "new-password" : "current-password";
+      landingPage.querySelector("#landingAuthError").textContent = "";
+    });
+
+    // Landing OAuth
+    landingPage.querySelectorAll(".landing-oauth-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        supabase.auth.signInWithOAuth({
+          provider: btn.dataset.provider,
+          options: { redirectTo: window.location.origin },
+        });
+      });
+    });
+
+    // Landing form submit
+    landingPage.querySelector("#landingAuthForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = landingPage.querySelector("#landingAuthError");
+      errEl.textContent = "";
+      const email = e.target.querySelector('[name="email"]').value.trim();
+      const password = e.target.querySelector('[name="password"]').value;
+      if (!email || !password) {
+        errEl.textContent = "Please enter your email and password.";
+        return;
+      }
+      if (landingIsSignUp) {
+        const username = e.target.querySelector('[name="username"]').value?.toLowerCase().trim();
+        if (!username || !/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username)) {
+          errEl.textContent = "Username must be 3\u201330 characters: lowercase letters, numbers, hyphens, underscores.";
+          return;
+        }
+        const { data: existing } = await supabase
+          .from("profiles").select("id").eq("username", username).single();
+        if (existing) { errEl.textContent = "Username already taken."; return; }
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+        if (signUpErr) { errEl.textContent = signUpErr.message; return; }
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .insert({ id: signUpData.user.id, username, display_name: username });
+        if (profileErr) { errEl.textContent = profileErr.message; return; }
+        currentUserProfile = { id: signUpData.user.id, username, display_name: username };
+        viewingProfile = currentUserProfile;
+        viewingUserId = currentUserProfile.id;
+        isOwner = true;
+        landingPage.style.display = "none";
+        history.pushState({}, '', `/${username}`);
+        await reloadCanvasData();
+        updateAuthUI();
+        if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { errEl.textContent = error.message; return; }
+        landingPage.style.display = "none";
+      }
+    });
 
     // Path change listener — navigate between user canvases (browser back/forward)
     window.addEventListener("popstate", async () => {
