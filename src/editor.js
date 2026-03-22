@@ -252,7 +252,7 @@ function extractRecipeBody(fullMarkdown) {
     }
   }
 
-  if (recipeStart === -1) return "";
+  if (recipeStart === -1) return fullMarkdown.trim();
   return lines.slice(recipeStart).join("\n").trim();
 }
 
