@@ -231,7 +231,11 @@ button.bag:focus{
 }
 @media (max-width: 760px){
   .modalMedia{
-    display: none;
+    padding: 20px;
+    max-height: 220px;
+  }
+  .modalMedia img{
+    max-height: 180px;
   }
   .modalBody{
     min-height: 0;
