@@ -199,6 +199,9 @@ button.bag:focus{
     display: flex;
     flex-direction: column;
     margin: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }
 .modalMedia{
@@ -215,8 +218,8 @@ button.bag:focus{
   max-height:340px;
   filter: drop-shadow(0 10px 18px rgba(0,0,0,.16));
 }
-.modalBody{ 
-  padding: 32px; 
+.modalBody{
+  padding: 32px;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
@@ -232,31 +235,17 @@ button.bag:focus{
 @media (max-width: 760px){
   .modalMedia{
     padding: 20px;
-    max-height: 220px;
+    flex-shrink: 0;
   }
   .modalMedia img{
-    max-height: 180px;
+    max-height: 200px;
   }
   .modalBody{
     min-height: 0;
     padding: 28px 24px;
-    padding-bottom: max(28px, env(safe-area-inset-bottom, 0px) + 28px); /* Account for safe area */
-    flex: 1 1 auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    overscroll-behavior: contain; /* Prevent scroll chaining */
-    /* Performance optimizations for mobile */
-    transform: translateZ(0); /* Force GPU acceleration */
-    -webkit-transform: translateZ(0);
-    contain: layout style paint;
-    backface-visibility: hidden;
-    isolation: isolate; /* Create new stacking context */
-    /* Reduce repaints during scroll */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Optimize scrolling performance */
-    scroll-behavior: auto; /* Disable smooth scroll for better performance */
-    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(28px, env(safe-area-inset-bottom, 0px) + 28px);
+    flex-shrink: 0;
+    overflow-y: visible;
   }
 }
 .titleRow{
