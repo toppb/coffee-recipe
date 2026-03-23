@@ -218,6 +218,8 @@ async function main() {
     // Landing background: load featured user's coffees
     const featured = await getProfileByUsername("toppbrocales");
     if (featured) {
+      viewingProfile = featured;
+      viewingUserId = featured.id;
       rawData = await loadCoffeesForUser(featured.id);
       fromSupabase = true;
     }
@@ -1563,6 +1565,8 @@ async function main() {
         // Reload featured user's coffees as background
         const featured = await getProfileByUsername("toppbrocales");
         if (featured) {
+          viewingProfile = featured;
+          viewingUserId = featured.id;
           const coffeesData = await loadCoffeesForUser(featured.id);
           baseItems = coffeesData.map((d) => {
             const number = Number(d.number);
