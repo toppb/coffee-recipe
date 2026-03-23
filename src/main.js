@@ -154,8 +154,13 @@ async function main() {
 
   // ── Routing ────────────────────────────────────────────────────────
   function getRouteUsername() {
-    const match = window.location.pathname.match(/^\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])$/);
+    const match = window.location.pathname.match(/^\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])(?:\/(\d+))?$/);
     return match ? match[1] : null;
+  }
+
+  function getRouteCoffeeNumber() {
+    const match = window.location.pathname.match(/^\/([a-z0-9][a-z0-9_-]{1,28}[a-z0-9])\/(\d+)$/);
+    return match ? parseInt(match[2], 10) : null;
   }
 
   async function resolveRoute() {
@@ -941,6 +946,13 @@ async function main() {
 
   // Start render loop
   requestAnimationFrame(render);
+
+  // Deep-link: open recipe modal if URL is /username/number
+  const deepLinkNumber = getRouteCoffeeNumber();
+  if (deepLinkNumber != null && baseItems.length) {
+    const deepItem = baseItems.find((i) => i.number === deepLinkNumber);
+    if (deepItem) openModal(deepItem, { pushState: false });
+  }
 
   // Hit testing - find item at screen position
   function hitTest(clickX, clickY) {
@@ -1731,6 +1743,20 @@ async function main() {
 
     // Path change listener — navigate between user canvases (browser back/forward)
     window.addEventListener("popstate", async () => {
+      // Handle recipe deep-link back/forward
+      const coffeeNum = getRouteCoffeeNumber();
+      if (coffeeNum != null && baseItems.length) {
+        const item = baseItems.find((i) => i.number === coffeeNum);
+        if (item) { openModal(item, { pushState: false }); return; }
+      }
+      // If we're back on the canvas (no coffee number), close any open modal
+      if (overlay.classList.contains("open") && !coffeeNum) {
+        overlay.classList.remove("open");
+        overlay.style.display = "none";
+        overlay.style.visibility = "hidden";
+        renderPaused = false;
+      }
+
       const result = await resolveRoute();
       if (result.found) {
         await reloadCanvasData();
@@ -2152,8 +2178,16 @@ async function main() {
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
 
-  async function openModal(it) {
+  async function openModal(it, { pushState = true } = {}) {
     currentModalItem = it;
+
+    // Update URL to /username/number for shareable links
+    if (pushState && viewingProfile?.username && it?.number != null) {
+      const recipeUrl = `/${viewingProfile.username}/${it.number}`;
+      if (window.location.pathname !== recipeUrl) {
+        history.pushState({ recipe: it.number }, '', recipeUrl);
+      }
+    }
 
     // Restore view-mode modal structure if editor was active
     const editorView = modalEl.querySelector(".editor-view");
@@ -2260,6 +2294,14 @@ async function main() {
     overlay.style.display = "none";
     overlay.style.visibility = "hidden";
     renderPaused = false;
+
+    // Revert URL to /username
+    if (viewingProfile?.username) {
+      const canvasUrl = `/${viewingProfile.username}`;
+      if (window.location.pathname !== canvasUrl) {
+        history.pushState({}, '', canvasUrl);
+      }
+    }
   }
 
   mClose.addEventListener("click", () => {
