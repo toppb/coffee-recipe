@@ -181,24 +181,24 @@ button.bag:focus{
 @media (max-width: 760px){
   .overlay{
     padding: 24px;
-    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px); /* Account for safe area at bottom */
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px);
     height: 100dvh;
     box-sizing: border-box;
-    align-items: stretch; /* Make modal fill available height */
+    align-items: center;
   }
   .overlay.open{
-    padding: 24px !important; /* Restore padding for mobile when open */
+    padding: 24px !important;
     padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px) !important;
+    align-items: center !important;
   }
-  .modal{ 
+  .modal{
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    max-height: 100%; /* Use 100% of overlay's available height */
-    height: 100%;
+    max-height: calc(100dvh - 48px);
     width: 100%;
     display: flex;
     flex-direction: column;
-    margin: 0; /* No margin on mobile since overlay has padding */
+    margin: 0;
   }
 }
 .modalMedia{
