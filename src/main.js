@@ -1542,8 +1542,12 @@ async function main() {
         }
       } else {
         currentUserProfile = null;
-        viewingUserId = null;
-        viewingProfile = null;
+        // Keep viewingProfile/viewingUserId if browsing someone's canvas while logged out
+        const routeUser = getRouteUsername();
+        if (!routeUser) {
+          viewingUserId = null;
+          viewingProfile = null;
+        }
         isOwner = false;
       }
       updateAuthUI();
