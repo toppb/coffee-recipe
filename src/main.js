@@ -947,13 +947,6 @@ async function main() {
   // Start render loop
   requestAnimationFrame(render);
 
-  // Deep-link: open recipe modal if URL is /username/number
-  const deepLinkNumber = getRouteCoffeeNumber();
-  if (deepLinkNumber != null && baseItems.length) {
-    const deepItem = baseItems.find((i) => i.number === deepLinkNumber);
-    if (deepItem) openModal(deepItem, { pushState: false });
-  }
-
   // Hit testing - find item at screen position
   function hitTest(clickX, clickY) {
     const worldX = clickX + camX;
@@ -2450,6 +2443,13 @@ async function main() {
       }
     }
   });
+
+  // Deep-link: open recipe modal if URL is /username/number
+  const deepLinkNumber = getRouteCoffeeNumber();
+  if (deepLinkNumber != null && baseItems.length) {
+    const deepItem = baseItems.find((i) => i.number === deepLinkNumber);
+    if (deepItem) openModal(deepItem, { pushState: false });
+  }
 }
 
 main().catch((err) => {
