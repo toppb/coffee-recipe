@@ -2448,7 +2448,7 @@ async function main() {
   const deepLinkNumber = getRouteCoffeeNumber();
   if (deepLinkNumber != null && baseItems.length) {
     const deepItem = baseItems.find((i) => i.number === deepLinkNumber);
-    if (deepItem) openModal(deepItem, { pushState: false });
+    if (deepItem) requestAnimationFrame(() => requestAnimationFrame(() => openModal(deepItem, { pushState: false })));
   }
 }
 
