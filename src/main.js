@@ -1359,6 +1359,7 @@ async function main() {
     searchQuery = "";
     searchInput.value = "";
     activeFilters = { type: [], brewer: [], grinder: [], rating: [], tastingNotes: [] };
+    populateFilterPills();
     filteredBaseItems = baseItems;
     duplicatedItems = createDuplicatedItems(filteredBaseItems);
     tileItems = createTileLayout();
@@ -1832,14 +1833,6 @@ async function main() {
   });
 
   // Filter modal
-  const filterOptions = {
-    type: [...new Set(baseItems.flatMap((i) => i.tags || []))].sort(),
-    brewer: [...new Set(baseItems.flatMap((i) => i.brewer || []))].sort(),
-    grinder: [...new Set(baseItems.flatMap((i) => i.grinder || []))].sort(),
-    rating: [...new Set(baseItems.map((i) => i.rating).filter(Boolean))].sort((a, b) => a - b).map(String),
-    tastingNotes: [...new Set(baseItems.flatMap((i) => i.notes || []))].sort(),
-  };
-
   const filterOverlay = document.createElement("div");
   filterOverlay.className = "overlay filter-overlay";
   filterOverlay.innerHTML = `
@@ -1877,39 +1870,53 @@ async function main() {
   `;
   document.body.appendChild(filterOverlay);
 
-  // Populate filter pills
-  Object.entries(filterOptions).forEach(([category, values]) => {
-    const row = filterOverlay.querySelector(`.filter-section[data-category="${category}"] .filter-pill-row`);
-    if (!row) return;
-    const displayValues = category === "rating" ? values.map((r) => "★".repeat(parseInt(r, 10))) : values;
-    values.forEach((value, idx) => {
-      const pill = document.createElement("button");
-      pill.className = "filter-pill";
-      pill.type = "button";
-      pill.dataset.category = category;
-      pill.dataset.value = value;
-      pill.textContent = displayValues[idx];
-      row.appendChild(pill);
+  // Populate filter pills (called on initial load and after reloadCanvasData)
+  function populateFilterPills() {
+    const opts = {
+      type: [...new Set(baseItems.flatMap((i) => i.tags || []))].sort(),
+      brewer: [...new Set(baseItems.flatMap((i) => i.brewer || []))].sort(),
+      grinder: [...new Set(baseItems.flatMap((i) => i.grinder || []))].sort(),
+      rating: [...new Set(baseItems.map((i) => i.rating).filter(Boolean))].sort((a, b) => a - b).map(String),
+      tastingNotes: [...new Set(baseItems.flatMap((i) => i.notes || []))].sort(),
+    };
+    Object.entries(opts).forEach(([category, values]) => {
+      const row = filterOverlay.querySelector(`.filter-section[data-category="${category}"] .filter-pill-row`);
+      if (!row) return;
+      row.innerHTML = "";
+      const displayValues = category === "rating" ? values.map((r) => "★".repeat(parseInt(r, 10))) : values;
+      values.forEach((value, idx) => {
+        const pill = document.createElement("button");
+        pill.className = "filter-pill";
+        pill.type = "button";
+        pill.dataset.category = category;
+        pill.dataset.value = value;
+        pill.textContent = displayValues[idx];
+        row.appendChild(pill);
+      });
     });
-  });
+    // Re-attach click listeners to new pills
+    filterOverlay.querySelectorAll(".filter-pill").forEach((pill) => {
+      pill.addEventListener("click", handleFilterPillClick);
+    });
+  }
+  populateFilterPills();
 
-  filterOverlay.querySelectorAll(".filter-pill").forEach((pill) => {
-    pill.addEventListener("click", () => {
-      const cat = pill.dataset.category;
-      const val = pill.dataset.value;
-      const arr = activeFilters[cat];
-      const idx = arr.indexOf(val);
-      if (idx >= 0) {
-        arr.splice(idx, 1);
-      } else {
-        arr.push(val);
-      }
-      pill.classList.toggle("selected", arr.includes(val));
-      rebuildLayoutForSearch(searchQuery);
-      updateFilterDot();
-      updateFilterClearButton();
-    });
-  });
+  function handleFilterPillClick(e) {
+    const pill = e.currentTarget;
+    const cat = pill.dataset.category;
+    const val = pill.dataset.value;
+    const arr = activeFilters[cat];
+    const idx = arr.indexOf(val);
+    if (idx >= 0) {
+      arr.splice(idx, 1);
+    } else {
+      arr.push(val);
+    }
+    pill.classList.toggle("selected", arr.includes(val));
+    rebuildLayoutForSearch(searchQuery);
+    updateFilterDot();
+    updateFilterClearButton();
+  }
 
   filterOverlay.querySelector(".filter-clear-btn").addEventListener("click", () => {
     Object.keys(activeFilters).forEach((k) => (activeFilters[k] = []));
