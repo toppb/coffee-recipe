@@ -1259,9 +1259,28 @@ async function main() {
   `;
   document.body.appendChild(emptyCanvasOverlay);
   emptyCanvasOverlay.querySelector("button").addEventListener("click", () => openEditor(null));
-  // Show on initial load if canvas is empty and user is the owner
-  if (baseItems.length === 0 && isOwner && !isLanding && !isNotFound) {
-    emptyCanvasOverlay.style.display = "flex";
+
+  // Empty canvas overlay for visitors — shown when viewing someone else's empty grid
+  const emptyVisitorOverlay = document.createElement("div");
+  emptyVisitorOverlay.className = "no-match-overlay";
+  emptyVisitorOverlay.style.display = "none";
+  const visitorName = viewingProfile?.display_name || viewingProfile?.username || "This person";
+  emptyVisitorOverlay.innerHTML = `
+    <div class="no-match-content">
+      <p class="no-match-emoji">☕️</p>
+      <p class="no-match-text">Good things are brewing</p>
+      <p class="no-match-subtext">${visitorName} hasn't added any recipes yet</p>
+    </div>
+  `;
+  document.body.appendChild(emptyVisitorOverlay);
+
+  // Show on initial load if canvas is empty
+  if (baseItems.length === 0 && !isLanding && !isNotFound) {
+    if (isOwner) {
+      emptyCanvasOverlay.style.display = "flex";
+    } else {
+      emptyVisitorOverlay.style.display = "flex";
+    }
   }
 
   noMatchOverlay.querySelector(".no-match-show-all-btn").addEventListener("click", () => {
@@ -1355,6 +1374,7 @@ async function main() {
     searchBar.style.display = "";
     noMatchOverlay.style.display = "none";
     emptyCanvasOverlay.style.display = baseItems.length === 0 && isOwner ? "flex" : "none";
+    emptyVisitorOverlay.style.display = baseItems.length === 0 && !isOwner ? "flex" : "none";
   }
 
   // ── Auth UI (signup + signin) ─────────────────────────────────────────
@@ -2384,6 +2404,7 @@ async function main() {
         hoveredItem = null;
         lastHoveredItem = null;
         emptyCanvasOverlay.style.display = "none";
+        emptyVisitorOverlay.style.display = "none";
 
         isEditing = false;
         editorInstance = null;

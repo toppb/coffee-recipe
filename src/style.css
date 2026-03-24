@@ -710,11 +710,22 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   gap: 16px;
 }
 
+.no-match-emoji{
+  margin: 0;
+  font-size: 48px;
+  line-height: 1;
+}
 .no-match-text{
   margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.5);
+}
+.no-match-subtext{
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.35);
 }
 
 .no-match-show-all-btn{
