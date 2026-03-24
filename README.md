@@ -4,6 +4,23 @@ A multi-user coffee recipe platform. Sign up, get your own canvas at `brewist.co
 
 ## ✨ Features
 
+### V4 – Multi-User Platform
+
+- **Sign Up / Sign In**: Anyone can create an account with a username and get their own canvas at `/#/username`.
+- **Personal Canvas**: Each user's coffee collection lives at their own URL — fully public to view, owner-only to edit.
+- **Recipe Creation**: Add coffees directly from your canvas — name, rating, origin, process, tasting notes, recipe, and bag image all editable in-app.
+- **Image Upload**: Upload a bag photo or let the app generate a placeholder illustration (randomised shape + colour).
+- **Public Profiles**: Share your canvas URL with anyone — no account needed to browse.
+- **Owner Controls**: Edit and delete buttons only appear when you're viewing your own canvas.
+- **Landing Page**: Visitors who aren't signed in see a clean landing page with Sign up / Sign in.
+
+### V3 – Editable Metadata (Supabase)
+
+- **Inline Editing**: When using Supabase, sign in to edit coffee metadata directly in the app.
+- **Editable Fields**: Name, rating, tags, roaster, origin, process, tasting notes, brewer, grinder, recipe markdown, and bag image.
+- **Image Upload**: Replace coffee bag images via the edit form; images are stored in Supabase Storage.
+- **Fallback**: Without Supabase configuration, the app works with static JSON and recipe files as before.
+
 ### V2 – Search & Filter
 
 - **Search**: Search by name, tags, tasting notes, or coffee number. Results update as you type. Use `/` to focus the search bar.
@@ -16,23 +33,6 @@ A multi-user coffee recipe platform. Sign up, get your own canvas at `brewist.co
 - **Combined Search & Filter**: Apply filters first, then search within results—or search first, then refine with filters.
 - **Active Filter Indicator**: A dot on the filter button shows when filters are applied.
 - **No Match State**: When no results match, a "Show all" button resets search and filters.
-
-### V3 – Editable Metadata (Supabase)
-
-- **Inline Editing**: When using Supabase, sign in to edit coffee metadata directly in the app.
-- **Editable Fields**: Name, rating, tags, roaster, origin, process, tasting notes, brewer, grinder, recipe markdown, and bag image.
-- **Image Upload**: Replace coffee bag images via the edit form; images are stored in Supabase Storage.
-- **Fallback**: Without Supabase configuration, the app works with static JSON and recipe files as before.
-
-### V4 – Multi-User Platform
-
-- **Sign Up / Sign In**: Anyone can create an account with a username and get their own canvas at `/#/username`.
-- **Personal Canvas**: Each user's coffee collection lives at their own URL — fully public to view, owner-only to edit.
-- **Recipe Creation**: Add coffees directly from your canvas — name, rating, origin, process, tasting notes, recipe, and bag image all editable in-app.
-- **Image Upload**: Upload a bag photo or let the app generate a placeholder illustration (randomised shape + colour).
-- **Public Profiles**: Share your canvas URL with anyone — no account needed to browse.
-- **Owner Controls**: Edit and delete buttons only appear when you're viewing your own canvas.
-- **Landing Page**: Visitors who aren't signed in see a clean landing page with Sign up / Sign in.
 
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for setup instructions.
 
