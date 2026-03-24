@@ -3,8 +3,23 @@ import { inject } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { supabase, hasSupabase } from "./supabase.js";
 
-inject();
-injectSpeedInsights();
+// Opt-out of analytics via ?notrack query param (persisted in localStorage)
+if (new URLSearchParams(window.location.search).has("notrack")) {
+  localStorage.setItem("brewist_notrack", "true");
+}
+if (new URLSearchParams(window.location.search).has("track")) {
+  localStorage.removeItem("brewist_notrack");
+}
+
+const isOptedOut = localStorage.getItem("brewist_notrack") === "true";
+
+inject({
+  beforeSend: (event) => (isOptedOut ? null : event),
+});
+
+if (!isOptedOut) {
+  injectSpeedInsights();
+}
 
 // Simple markdown parser
 function parseMarkdown(md) {
@@ -1801,7 +1816,7 @@ async function main() {
     type: [...new Set(baseItems.flatMap((i) => i.tags || []))].sort(),
     brewer: [...new Set(baseItems.flatMap((i) => i.brewer || []))].sort(),
     grinder: [...new Set(baseItems.flatMap((i) => i.grinder || []))].sort(),
-    rating: ["3", "4", "5"],
+    rating: [...new Set(baseItems.map((i) => i.rating).filter(Boolean))].sort((a, b) => a - b).map(String),
     tastingNotes: [...new Set(baseItems.flatMap((i) => i.notes || []))].sort(),
   };
 
