@@ -40,8 +40,8 @@ function parseMarkdown(md) {
   html = html.replace(/^---$/gim, '<hr>');
   html = html.replace(/^\*\*\*$/gim, '<hr>');
   
-  // Lists - unordered
-  html = html.replace(/^    [\*\-\+] (.+)$/gim, '<li class="nested">$1</li>');
+  // Lists - unordered (nested: 2+ spaces or tab indent)
+  html = html.replace(/^ {2,}[\*\-\+] (.+)$/gim, '<li class="nested">$1</li>');
   html = html.replace(/^\t[\*\-\+] (.+)$/gim, '<li class="nested">$1</li>');
   html = html.replace(/^[\*\-\+] (.+)$/gim, '<li>$1</li>');
   
