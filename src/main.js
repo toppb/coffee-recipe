@@ -2355,11 +2355,7 @@ async function main() {
     closeModal();
   });
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) {
-      if (isEditing && editorInstance?.cancel) {
-        editorInstance.cancel();
-        return;
-      }
+    if (e.target === overlay && !isEditing) {
       closeModal();
     }
   });
