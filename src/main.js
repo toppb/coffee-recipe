@@ -274,7 +274,7 @@ async function main() {
   landingPage.innerHTML = `
     <div class="landing-content">
       <h1 class="landing-title">Brewist</h1>
-      <p class="landing-subtitle">Add, share and discover coffee recipes</p>
+      <p class="landing-subtitle">Your personal canvas of coffee recipes</p>
       <div class="landing-card">
         <h2 class="landing-card-title" id="landingAuthTitle">Sign up</h2>
         <div class="auth-oauth-buttons">
@@ -1597,7 +1597,7 @@ async function main() {
         searchBar.style.display = "none";
         landingPage.style.display = "flex";
         landingPage.querySelector(".landing-subtitle").textContent =
-          "Add, share and discover coffee recipes";
+          "Your personal canvas of coffee recipes";
         landingPage.querySelector(".landing-card").style.display = "";
         authBtn.style.display = "none";
         await supabase.auth.signOut();
