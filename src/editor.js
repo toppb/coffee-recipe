@@ -340,6 +340,11 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   imgOverlay.textContent = item?.img ? "Change image" : "Add image";
   imgSection.appendChild(imgOverlay);
 
+  const imgHint = document.createElement("span");
+  imgHint.className = "editor-image-hint";
+  imgHint.textContent = "Photos with transparent background work best";
+  imgSection.appendChild(imgHint);
+
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/png,image/jpeg,image/webp";
