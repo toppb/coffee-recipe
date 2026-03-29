@@ -365,7 +365,7 @@ async function main() {
     return {
       ...d,
       number,
-      img: d.img || imgFor(number),
+      img: d.img || (fromSupabase ? "" : imgFor(number)),
     };
   });
 
@@ -1349,7 +1349,7 @@ async function main() {
 
     baseItems = newData.map((d) => {
       const number = Number(d.number);
-      return { ...d, number, img: d.img || imgFor(number) };
+      return { ...d, number, img: d.img || "" };
     });
 
     imageCache.clear();
