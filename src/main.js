@@ -211,7 +211,7 @@ async function main() {
     if (!error && rows?.length) {
       return rows.map((r) => ({
         id: r.id, number: r.number, name: r.name, rating: r.rating,
-        tags: r.tags || [], img: r.img_url || imgFor(r.number),
+        tags: r.tags || [], img: r.img_url || "",
         roaster: r.roaster || "", origin: r.origin || "",
         process: r.process || "", notes: r.notes || [],
         brew: r.brew || "", brewer: r.brewer || [],
