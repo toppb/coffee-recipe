@@ -2423,6 +2423,19 @@ async function main() {
           closeModal();
         }
       },
+      onDuplicate: async (dupItem) => {
+        baseItems.push(dupItem);
+        await loadImageToCache(dupItem.number, dupItem.img);
+        filteredBaseItems = baseItems;
+        duplicatedItems = createDuplicatedItems(filteredBaseItems);
+        tileItems = createTileLayout();
+        hoveredItem = null;
+        lastHoveredItem = null;
+        isEditing = false;
+        editorInstance = null;
+        currentModalItem = dupItem;
+        openModal(dupItem);
+      },
       onDelete: (deletedItem) => {
         isEditing = false;
         editorInstance = null;

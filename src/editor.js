@@ -297,7 +297,7 @@ function createToolbar(editor) {
   return toolbar;
 }
 
-export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions, placeholderSrc, userId, onSave, onCancel, onDelete }) {
+export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions, placeholderSrc, userId, onSave, onCancel, onDelete, onDuplicate }) {
   const isNew = !item;
 
   const mediaEl = modalEl.querySelector(".modalMedia");
@@ -434,11 +434,107 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   footer.appendChild(cancelBtn);
 
   if (!isNew) {
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "editor-delete-btn";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", async () => {
+    const menuWrap = document.createElement("div");
+    menuWrap.className = "editor-more-menu";
+
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "editor-more-btn";
+    menuBtn.innerHTML = "&#8942;"; // vertical ellipsis
+    menuBtn.setAttribute("aria-label", "More options");
+
+    const menuDropdown = document.createElement("div");
+    menuDropdown.className = "editor-more-dropdown";
+
+    const dupBtn = document.createElement("button");
+    dupBtn.type = "button";
+    dupBtn.className = "editor-more-item";
+    dupBtn.textContent = "Duplicate";
+    dupBtn.addEventListener("click", async () => {
+      menuDropdown.classList.remove("open");
+      errEl.textContent = "";
+      try {
+        // Get next number
+        const { data: maxRow } = await supabase
+          .from("coffees")
+          .select("number")
+          .eq("user_id", userId)
+          .order("number", { ascending: false })
+          .limit(1)
+          .single();
+        const nextNumber = (maxRow?.number || 0) + 1;
+
+        // Copy the image to a new path if one exists
+        let newImgUrl = item.img || null;
+        if (newImgUrl) {
+          const srcPath = `${userId}/coffee-bag-${pad2(item.number)}.webp`;
+          const destPath = `${userId}/coffee-bag-${pad2(nextNumber)}.webp`;
+          const resp = await fetch(newImgUrl);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            await supabase.storage.from("coffee-bags").upload(destPath, blob, { contentType: "image/webp", upsert: true });
+            const { data } = supabase.storage.from("coffee-bags").getPublicUrl(destPath);
+            newImgUrl = data.publicUrl;
+          }
+        }
+
+        const payload = {
+          number: nextNumber,
+          user_id: userId,
+          name: item.name,
+          rating: item.rating || null,
+          tags: item.tags || [],
+          img_url: newImgUrl,
+          notes: item.notes || [],
+          brewer: item.brewer || [],
+          grinder: item.grinder || [],
+          recipe_body: item.recipe_body || "",
+          roaster: item.roaster || "",
+          origin: item.origin || "",
+          process: item.process || "",
+          brew: item.brew || "",
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data: inserted, error } = await supabase
+          .from("coffees")
+          .insert(payload)
+          .select()
+          .single();
+        if (error) {
+          errEl.textContent = error.message;
+          return;
+        }
+
+        const dupItem = {
+          id: inserted.id,
+          number: inserted.number,
+          name: inserted.name,
+          rating: inserted.rating,
+          tags: inserted.tags || [],
+          img: inserted.img_url || "",
+          roaster: inserted.roaster || "",
+          origin: inserted.origin || "",
+          process: inserted.process || "",
+          notes: inserted.notes || [],
+          brew: inserted.brew || "",
+          brewer: inserted.brewer || [],
+          grinder: inserted.grinder || [],
+          recipe_body: inserted.recipe_body || "",
+        };
+        tiptapEditor.destroy();
+        if (onDuplicate) onDuplicate(dupItem);
+      } catch (err) {
+        errEl.textContent = "Duplicate failed: " + (err.message || err);
+      }
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "editor-more-item editor-more-item--danger";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", async () => {
+      menuDropdown.classList.remove("open");
       if (!confirm("Are you sure you want to delete this coffee?")) return;
       errEl.textContent = "";
       try {
@@ -456,7 +552,22 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
         errEl.textContent = "Delete failed: " + (err.message || err);
       }
     });
-    footer.appendChild(deleteBtn);
+
+    menuDropdown.appendChild(dupBtn);
+    menuDropdown.appendChild(delBtn);
+    menuWrap.appendChild(menuBtn);
+    menuWrap.appendChild(menuDropdown);
+
+    menuBtn.addEventListener("click", () => {
+      menuDropdown.classList.toggle("open");
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!menuWrap.contains(e.target)) menuDropdown.classList.remove("open");
+    });
+
+    footer.appendChild(menuWrap);
   }
 
   view.appendChild(footer);

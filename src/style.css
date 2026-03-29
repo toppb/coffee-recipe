@@ -1369,20 +1369,64 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 .editor-cancel-btn:hover{
   background: rgba(0,0,0,.04);
 }
-.editor-delete-btn{
+.editor-more-menu{
   margin-left: auto;
-  padding: 9px 18px;
-  border: 1px solid rgba(200,0,0,.2);
+  position: relative;
+}
+.editor-more-btn{
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(0,0,0,.12);
   background: transparent;
   border-radius: 8px;
-  font-size: 13px;
-  color: #b91c1c;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(0,0,0,.5);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: inherit;
 }
-.editor-delete-btn:hover{
+.editor-more-btn:hover{
+  background: rgba(0,0,0,.04);
+  color: rgba(0,0,0,.7);
+}
+.editor-more-dropdown{
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  min-width: 140px;
+  overflow: hidden;
+  z-index: 10;
+}
+.editor-more-dropdown.open{
+  display: flex;
+  flex-direction: column;
+}
+.editor-more-item{
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: rgba(0,0,0,.8);
+}
+.editor-more-item:hover{
+  background: rgba(0,0,0,.04);
+}
+.editor-more-item--danger{
+  color: #b91c1c;
+}
+.editor-more-item--danger:hover{
   background: rgba(200,0,0,.06);
-  border-color: rgba(200,0,0,.35);
 }
 
 /* Add coffee button */
