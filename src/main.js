@@ -309,10 +309,17 @@ async function main() {
     landingPage.style.display = "flex";
   } else if (isNotFound) {
     canvas.style.display = "none";
-    landingPage.style.display = "flex";
-    landingPage.querySelector(".landing-subtitle").textContent =
-      `No canvas found for @${routeResult.username}`;
-    landingPage.querySelector(".landing-card").style.display = "none";
+    landingPage.style.display = "none";
+    const notFoundOverlay = document.createElement("div");
+    notFoundOverlay.className = "no-match-overlay";
+    notFoundOverlay.style.display = "flex";
+    notFoundOverlay.innerHTML = `
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <p class="no-match-text">No account found for @${routeResult.username}</p>
+        <button class="no-match-show-all-btn" type="button" onclick="window.location.href='/'">Go to home page</button>
+      </div>
+    `;
+    document.body.appendChild(notFoundOverlay);
   } else {
     landingPage.style.display = "none";
   }
@@ -1806,9 +1813,19 @@ async function main() {
       } else {
         canvas.style.display = "none";
         searchBar.style.display = "none";
-        landingPage.style.display = "flex";
-        landingPage.querySelector(".landing-subtitle").textContent =
-          `No canvas found for @${result.username}`;
+        const existingNf = document.querySelector(".not-found-overlay");
+        if (!existingNf) {
+          const nfOverlay = document.createElement("div");
+          nfOverlay.className = "no-match-overlay not-found-overlay";
+          nfOverlay.style.display = "flex";
+          nfOverlay.innerHTML = `
+            <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
+              <p class="no-match-text">No account found for @${result.username}</p>
+              <button class="no-match-show-all-btn" type="button" onclick="window.location.href='/'">Go to home page</button>
+            </div>
+          `;
+          document.body.appendChild(nfOverlay);
+        }
       }
     });
   }
