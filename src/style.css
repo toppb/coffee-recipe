@@ -1075,13 +1075,19 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,.35);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
   opacity: 0;
   transition: opacity .15s ease;
   pointer-events: none;
+}
+.editor-image-overlay::after{
+  content: attr(data-label);
+  padding: 7px 16px;
+  border: 1.5px solid rgba(255,255,255,.8);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
 }
 .editor-image:hover .editor-image-overlay{
   opacity: 1;
@@ -1090,8 +1096,10 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
 .editor-image--empty .editor-image-overlay{
   opacity: 1;
   background: transparent;
+}
+.editor-image--empty .editor-image-overlay::after{
+  border-color: rgba(0,0,0,.25);
   color: rgba(0,0,0,.4);
-  font-size: 14px;
 }
 .editor-image-hint{
   position: absolute;

@@ -337,13 +337,16 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
 
   const imgOverlay = document.createElement("span");
   imgOverlay.className = "editor-image-overlay";
-  imgOverlay.textContent = item?.img ? "Change image" : "Add image";
+  imgOverlay.dataset.label = item?.img ? "Change image" : "Add image";
   imgSection.appendChild(imgOverlay);
 
-  const imgHint = document.createElement("span");
-  imgHint.className = "editor-image-hint";
-  imgHint.textContent = "Photos with transparent background work best";
-  imgSection.appendChild(imgHint);
+  let imgHint = null;
+  if (isNew) {
+    imgHint = document.createElement("span");
+    imgHint.className = "editor-image-hint";
+    imgHint.textContent = "Photos with transparent background work best";
+    imgSection.appendChild(imgHint);
+  }
 
   const fileInput = document.createElement("input");
   fileInput.type = "file";
@@ -356,7 +359,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
       imgEl.src = url;
       imgEl.style.display = "";
       imgSection.classList.remove("editor-image--empty");
-      imgOverlay.textContent = "Change image";
+      imgOverlay.dataset.label = "Change image";
+      if (imgHint) imgHint.style.display = "none";
     }
   });
   imgSection.appendChild(fileInput);
