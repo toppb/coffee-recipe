@@ -483,14 +483,14 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
             const blob = await resp.blob();
             await supabase.storage.from("coffee-bags").upload(destPath, blob, { contentType: "image/webp", upsert: true });
             const { data } = supabase.storage.from("coffee-bags").getPublicUrl(destPath);
-            newImgUrl = data.publicUrl;
+            newImgUrl = data.publicUrl + "?t=" + Date.now();
           }
         }
 
         const payload = {
           number: nextNumber,
           user_id: userId,
-          name: item.name,
+          name: item.name + " (copy)",
           rating: item.rating || null,
           tags: item.tags || [],
           img_url: newImgUrl,
