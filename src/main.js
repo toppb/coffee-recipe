@@ -313,6 +313,7 @@ async function main() {
   if (isLanding) {
     // Show grid behind landing overlay (canvas stays visible)
     landingPage.style.display = "flex";
+    loadingEl.style.display = "none";
   } else if (isNotFound) {
     canvas.style.display = "none";
     landingPage.style.display = "none";
