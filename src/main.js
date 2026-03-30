@@ -244,6 +244,12 @@ async function main() {
     rawData = await res.json();
   }
 
+  // Loading indicator
+  const loadingEl = document.createElement("div");
+  loadingEl.className = "canvas-loading";
+  loadingEl.innerHTML = '<div class="canvas-loading-spinner"></div>';
+  document.body.appendChild(loadingEl);
+
   // Create canvas
   const canvas = document.createElement("canvas");
   canvas.id = "stage";
@@ -640,6 +646,7 @@ async function main() {
 
   // Wait for all images to load
   await Promise.all(imageLoadPromises);
+  loadingEl.classList.add("canvas-loading--hidden");
 
   // Create masonry layout for a tile using actual image sizes
   // Store column ending heights for seamless tiling
@@ -1349,6 +1356,7 @@ async function main() {
   // ── Reload canvas for a different user ────────────────────────────────
   async function reloadCanvasData() {
     const gen = ++loadGeneration;
+    loadingEl.classList.remove("canvas-loading--hidden");
     const newData = hasSupabase && viewingUserId
       ? await loadCoffeesForUser(viewingUserId)
       : [];
@@ -1362,6 +1370,7 @@ async function main() {
     imageCache.clear();
     imageDimensions.clear();
     await Promise.all(baseItems.map((item) => loadImageToCache(item.number, item.img)));
+    loadingEl.classList.add("canvas-loading--hidden");
 
     searchQuery = "";
     searchInput.value = "";

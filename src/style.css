@@ -1,3 +1,29 @@
+/* Canvas loading indicator */
+.canvas-loading{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+.canvas-loading--hidden{
+  opacity: 0;
+}
+.canvas-loading-spinner{
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(0,0,0,.1);
+  border-top-color: rgba(0,0,0,.35);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin{
+  to{ transform: rotate(360deg); }
+}
+
 :root{
   --bg: #F6F0E6;
   --shadow: 0 10px 30px rgba(0,0,0,.12);
