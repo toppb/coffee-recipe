@@ -449,6 +449,7 @@ async function main() {
   }
   
   duplicatedItems = createDuplicatedItems(baseItems);
+  const baseItemMap = new Map(baseItems.map(b => [b.number, b]));
 
   // Preload images and get their dimensions
   const imageCache = new Map();
@@ -643,11 +644,16 @@ async function main() {
     }
   }
 
-  const imageLoadPromises = baseItems.map((item) => loadImageToCache(item.number, item.img));
+  const imageLoadingSet = new Set();
 
-  // Wait for all images to load
-  await Promise.all(imageLoadPromises);
-  loadingEl.classList.add("canvas-loading--hidden");
+  // Set placeholder dimensions for all items immediately so layout can proceed
+  baseItems.forEach((item) => {
+    imageDimensions.set(item.number, {
+      width: PLACEHOLDER_W,
+      height: PLACEHOLDER_H,
+      aspectRatio: PLACEHOLDER_H / PLACEHOLDER_W,
+    });
+  });
 
   // Create masonry layout for a tile using actual image sizes
   // Store column ending heights for seamless tiling
@@ -775,6 +781,51 @@ async function main() {
     }
   }
   centerOnFirstBag();
+
+  // Load images for the initially visible viewport, then rebuild layout with real dimensions
+  {
+    const viewLeft = camX - 200;
+    const viewRight = camX + canvasWidth + 200;
+    const viewTop = camY - 200;
+    const viewBottom = camY + canvasHeight + 200;
+
+    const initialNumbers = new Set();
+    for (let col = 0; col < COLS; col++) {
+      const colItems = tileItems.filter(item => item.col === col);
+      if (!colItems.length) continue;
+      const colHeight = columnEndHeights[col];
+      const startTileY = Math.floor(viewTop / colHeight) - 1;
+      const endTileY = Math.ceil(viewBottom / colHeight) + 1;
+      for (let ty = startTileY; ty <= endTileY; ty++) {
+        colItems.forEach(item => {
+          const worldY = item.y + ty * colHeight;
+          if (worldY + item.height < viewTop || worldY > viewBottom) return;
+          const startTileX = Math.floor(viewLeft / TILE_WIDTH) - 1;
+          const endTileX = Math.ceil(viewRight / TILE_WIDTH) + 1;
+          for (let tx = startTileX; tx <= endTileX; tx++) {
+            const worldX = item.x + tx * TILE_WIDTH;
+            if (worldX + item.width < viewLeft || worldX > viewRight) continue;
+            initialNumbers.add(item.number);
+          }
+        });
+      }
+    }
+
+    await Promise.all([...initialNumbers].map(num => {
+      const baseItem = baseItemMap.get(num);
+      if (baseItem?.img) {
+        imageLoadingSet.add(num);
+        return loadImageToCache(num, baseItem.img).then(() => imageLoadingSet.delete(num));
+      }
+      return Promise.resolve();
+    }));
+
+    // Rebuild with real dimensions for the initial viewport items
+    tileItems = createTileLayout();
+    centerOnFirstBag();
+  }
+
+  loadingEl.classList.add("canvas-loading--hidden");
 
   // Rebuild layout for search and filter results
   function rebuildLayoutForSearch(query) {
@@ -905,7 +956,18 @@ async function main() {
             const screenY = worldY - camY;
             
             const img = imageCache.get(item.number);
-            
+
+            // Lazy-load image if visible but not yet cached
+            if (!img && !imageLoadingSet.has(item.number)) {
+              const baseItem = baseItemMap.get(item.number);
+              if (baseItem?.img) {
+                imageLoadingSet.add(item.number);
+                loadImageToCache(item.number, baseItem.img).then(() => {
+                  imageLoadingSet.delete(item.number);
+                });
+              }
+            }
+
             // Apply transition alpha for search results fade-in
             const shouldShowPlaceholder = searchTransitionAlpha < 0.3;
             
