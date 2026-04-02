@@ -1027,8 +1027,10 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   width: calc(100% - 48px);
 }
 .landing-title{
-  font-size: 42px;
-  font-weight: 700;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -2px;
   margin: 0 0 8px;
   color: #fff;
   text-shadow: 0 2px 12px rgba(0,0,0,0.3);
