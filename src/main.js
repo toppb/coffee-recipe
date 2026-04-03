@@ -455,144 +455,102 @@ async function main() {
   const imageCache = new Map();
   const imageDimensions = new Map();
   
-  // Fixed size for items without an image (portrait ratio matching most coffee bags)
+  // Fixed size for items without an image (matches placeholder bag aspect ratio 728×1125)
   const PLACEHOLDER_W = 200;
-  const PLACEHOLDER_H = 300;
+  const PLACEHOLDER_H = Math.round(200 * 1125 / 728);
 
-  // Colour palette cycled across placeholder bags — body, seal, text, crimp-line colour
-  const BAG_PALETTE = [
-    { body: "#C5A87A", seal: "#A8895A", text: "rgba(70,45,15,0.6)",      crimp: "rgba(0,0,0,0.22)"    }, // kraft
-    { body: "#E2D49A", seal: "#C8BA72", text: "rgba(60,45,10,0.6)",      crimp: "rgba(0,0,0,0.18)"    }, // manila
-    { body: "#EDEAE3", seal: "#D0CBC0", text: "rgba(50,45,38,0.55)",     crimp: "rgba(0,0,0,0.15)"    }, // off-white
-    { body: "#3E3C39", seal: "#2C2A27", text: "rgba(240,235,225,0.65)",  crimp: "rgba(255,255,255,0.2)" }, // dark grey
+  // Placeholder bag image variants (order = color cycling by item number)
+  const BAG_VARIANTS = [
+    { src: "/placeholder-bags/bag-blue.webp",   text: "#115673" },
+    { src: "/placeholder-bags/bag-green.webp",  text: "#376016" },
+    { src: "/placeholder-bags/bag-orange.webp", text: "#714d17" },
+    { src: "/placeholder-bags/bag-pink.webp",   text: "#8b2b1e" },
+    { src: "/placeholder-bags/bag-red.webp",    text: "#9f5147" },
   ];
 
-  // ─── Canvas bag-shape drawing helpers ────────────────────────────────────
+  // Preload all 5 placeholder bag images
+  const placeholderBagImages = new Map();
+  await Promise.all(BAG_VARIANTS.map((v, i) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { placeholderBagImages.set(i, img); resolve(); };
+    img.onerror = resolve;
+    img.src = v.src;
+  })));
 
-  function _bagGradient(ctx, bx, by, bw, bh) {
-    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-    g.addColorStop(0,   "rgba(0,0,0,0.13)");
-    g.addColorStop(0.1, "rgba(0,0,0,0.03)");
-    g.addColorStop(0.5, "rgba(255,255,255,0.03)");
-    g.addColorStop(0.9, "rgba(0,0,0,0.03)");
-    g.addColorStop(1,   "rgba(0,0,0,0.13)");
-    ctx.fillStyle = g;
-    ctx.fillRect(bx, by, bw, bh);
-  }
+  // ─── Placeholder bag drawing ──────────────────────────────────────────────
 
-  function _bagCrimp(ctx, x1, y, x2, sealH, count, col) {
-    ctx.strokeStyle = col.crimp;
-    ctx.lineWidth = 0.5;
-    for (let i = 1; i <= count; i++) {
-      const ly = y + (sealH * i) / (count + 1);
-      ctx.beginPath(); ctx.moveTo(x1, ly); ctx.lineTo(x2, ly); ctx.stroke();
+  function drawBrewistBag(ctx, bx, by, bw, bh, variantIndex, name) {
+    const bagImg = placeholderBagImages.get(variantIndex);
+    const col = BAG_VARIANTS[variantIndex];
+
+    // Draw bag image scaled to fit, clipped to rounded rect
+    const cr = Math.min(Math.round(bw * 0.06), 10);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, cr);
+    ctx.clip();
+
+    if (bagImg) {
+      ctx.drawImage(bagImg, bx, by, bw, bh);
+    } else {
+      // Fallback solid fill while image loads
+      ctx.fillStyle = "#d4d0c8";
+      ctx.fillRect(bx, by, bw, bh);
+    }
+    ctx.restore();
+
+    // Coffee name text overlay in the white label area
+    // Label occupies bh*0.449 to bh*0.937 (measured from PNG pixel data)
+    if (name) {
+      const labelMarginX = bw * 0.08;
+      const labelTop = by + bh * 0.449;
+      const labelBot = by + bh * 0.937;
+      const labelW = bw - labelMarginX * 2;
+      const labelH = labelBot - labelTop;
+      const padX = labelW * 0.10;
+      const padY = labelH * 0.12;
+      const maxLineW = labelW - padX * 2;
+      const fontSize = Math.max(9, Math.round(labelW * 0.10));
+
+      ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = col.text;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const words = name.split(" ");
+      const rawLines = [];
+      let line = "";
+      for (const word of words) {
+        const test = line ? line + " " + word : word;
+        if (ctx.measureText(test).width > maxLineW && line) {
+          rawLines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) rawLines.push(line);
+
+      // Cap at 6 lines, add ellipsis if truncated
+      let displayLines = rawLines.slice(0, 6);
+      if (rawLines.length > 6) {
+        let last = displayLines[5];
+        while (last.length > 0 && ctx.measureText(last + "…").width > maxLineW) {
+          last = last.slice(0, -1).trimEnd();
+        }
+        displayLines[5] = last + "…";
+      }
+
+      const lineH = fontSize * 1.45;
+      const totalTextH = displayLines.length * lineH;
+      const textAreaH = labelH - padY * 2;
+      const startY = labelTop + padY + (textAreaH - totalTextH) / 2 + lineH / 2;
+      displayLines.forEach((l, i) => {
+        ctx.fillText(l, bx + bw / 2, startY + i * lineH);
+      });
+      ctx.textAlign = "start";
     }
   }
-
-  function _bagName(ctx, bx, bw, textBodyY, textBodyH, name, col) {
-    if (!name) return;
-    const pad = bw * 0.12;
-    const maxLineW = bw - pad * 2;
-    const fontSize = Math.max(11, Math.round(bw * 0.075));
-    ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.fillStyle = col.text;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const words = name.split(" ");
-    const lines = [];
-    let line = "";
-    for (const word of words) {
-      const test = line ? line + " " + word : word;
-      if (ctx.measureText(test).width > maxLineW && line) { lines.push(line); line = word; }
-      else { line = test; }
-    }
-    if (line) lines.push(line);
-    const lineH = fontSize * 1.4;
-    const totalH = lines.length * lineH;
-    const startY = textBodyY + textBodyH / 2 - totalH / 2 + lineH / 2;
-    lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, startY + i * lineH));
-    ctx.textAlign = "start";
-  }
-
-  // Shape 0 — Four-seal bag: plain rectangle, prominent top seal
-  function drawFourSealBag(ctx, bx, by, bw, bh, col, name) {
-    const sealH = Math.round(bh * 0.09);
-    const cr = Math.min(Math.round(bw * 0.025), 4);
-    const path = () => { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, cr); };
-    ctx.save(); path(); ctx.clip();
-    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
-    _bagGradient(ctx, bx, by, bw, bh);
-    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
-    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 3, col);
-    ctx.restore();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
-    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
-  }
-
-  // Shape 1 — Stand-up pouch: wide top, tapers toward bottom
-  function drawStandUpPouch(ctx, bx, by, bw, bh, col, name) {
-    const ti = bw * 0.05, sealH = Math.round(bh * 0.065);
-    const cr = Math.min(Math.round(bw * 0.03), 5);
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(bx, by); ctx.lineTo(bx + bw, by);
-      ctx.lineTo(bx + bw - ti, by + bh - cr);
-      ctx.quadraticCurveTo(bx + bw - ti, by + bh, bx + bw - ti - cr, by + bh);
-      ctx.lineTo(bx + ti + cr, by + bh);
-      ctx.quadraticCurveTo(bx + ti, by + bh, bx + ti, by + bh - cr);
-      ctx.closePath();
-    };
-    ctx.save(); path(); ctx.clip();
-    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
-    _bagGradient(ctx, bx, by, bw, bh);
-    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
-    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 4, col);
-    ctx.restore();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
-    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
-  }
-
-  // Shape 2 — Flat-bottom pouch: simple rounded rectangle with full-width seal
-  function drawFlatBottomPouch(ctx, bx, by, bw, bh, col, name) {
-    const cr = Math.min(Math.round(bw * 0.025), 5);
-    const sealH = Math.round(bh * 0.09);
-    const path = () => { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, cr); };
-    ctx.save(); path(); ctx.clip();
-    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
-    _bagGradient(ctx, bx, by, bw, bh);
-    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
-    _bagCrimp(ctx, bx + 2, by, bx + bw - 2, sealH, 3, col);
-    ctx.restore();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
-    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
-  }
-
-  // Shape 3 — Side-fold bag: narrow top, widens toward the bottom (inverse of stand-up pouch)
-  function drawSideFoldBag(ctx, bx, by, bw, bh, col, name) {
-    const ti = Math.round(bw * 0.05);
-    const cr = Math.min(Math.round(bw * 0.03), 5);
-    const sealH = Math.round(bh * 0.065);
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(bx + ti, by);
-      ctx.lineTo(bx + bw - ti, by);
-      ctx.lineTo(bx + bw, by + bh - cr);
-      ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - cr, by + bh);
-      ctx.lineTo(bx + cr, by + bh);
-      ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - cr);
-      ctx.closePath();
-    };
-    ctx.save(); path(); ctx.clip();
-    ctx.fillStyle = col.body; ctx.fillRect(bx, by, bw, bh);
-    _bagGradient(ctx, bx, by, bw, bh);
-    ctx.fillStyle = col.seal; ctx.fillRect(bx, by, bw, sealH);
-    _bagCrimp(ctx, bx + ti + 2, by, bx + bw - ti - 2, sealH, 3, col);
-    ctx.restore();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1; path(); ctx.stroke();
-    _bagName(ctx, bx, bw, by + sealH, bh - sealH, name, col);
-  }
-
-  const BAG_DRAW_FNS = [drawFourSealBag, drawStandUpPouch, drawFlatBottomPouch, drawSideFoldBag];
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1006,11 +964,9 @@ async function main() {
               
               ctx.globalAlpha = 1;
             } else {
-              // Draw placeholder coffee bag — shape and colour vary by item number
-              const col = BAG_PALETTE[(item.number + 2) % BAG_PALETTE.length];
-              BAG_DRAW_FNS[item.number % BAG_DRAW_FNS.length](
-                ctx, screenX, screenY, item.width, item.height, col, item.name
-              );
+              // Draw placeholder coffee bag
+              const variantIndex = item.number % BAG_VARIANTS.length;
+              drawBrewistBag(ctx, screenX, screenY, item.width, item.height, variantIndex, item.name);
             }
           }
         });
@@ -2224,90 +2180,18 @@ async function main() {
   let isEditing = false;
   let editorInstance = null;
 
-  // Generates an SVG data URL of a coffee bag placeholder — shape & colour vary by number
+  // Generates an SVG data URL of a Brewist-style coffee bag placeholder
   function makeBagSVG(name, number = 0) {
-    const w = 200, h = 300;
-    const col = BAG_PALETTE[(number + 2) % BAG_PALETTE.length];
-    const shapeIdx = number % 4;
-    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    const gradDef = `<linearGradient id="sg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">
-        <stop offset="0"   stop-color="rgba(0,0,0,0.13)"/>
-        <stop offset="0.1" stop-color="rgba(0,0,0,0.03)"/>
-        <stop offset="0.5" stop-color="rgba(255,255,255,0.03)"/>
-        <stop offset="0.9" stop-color="rgba(0,0,0,0.03)"/>
-        <stop offset="1"   stop-color="rgba(0,0,0,0.13)"/>
-      </linearGradient>`;
-
-    const crimp = (x1, x2, sH, n) =>
-      Array.from({ length: n }, (_, i) => {
-        const ly = ((sH * (i + 1)) / (n + 1)).toFixed(1);
-        return `<line x1="${x1}" y1="${ly}" x2="${x2}" y2="${ly}" stroke="${col.crimp}" stroke-width="0.5"/>`;
-      }).join("");
-
-    let d, sealEl, extraEl = "", textBodyY;
-    let svgViewBox = `0 0 ${w} ${h}`, svgW = w;
-
-    if (shapeIdx === 0) {
-      // Four-seal bag — plain rectangle, prominent top seal
-      const cr = 5, sH = Math.round(h * 0.09);
-      d = `M${cr},0 Q0,0 0,${cr} L0,${h-cr} Q0,${h} ${cr},${h} L${w-cr},${h} Q${w},${h} ${w},${h-cr} L${w},${cr} Q${w},0 ${w-cr},0 Z`;
-      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
-      <g clip-path="url(#b)">${crimp(2, w-2, sH, 3)}</g>`;
-      textBodyY = sH;
-
-    } else if (shapeIdx === 1) {
-      // Stand-up pouch — wide top, tapers to narrower bottom
-      const ti = Math.round(w * 0.05), cr = Math.round(w * 0.03), sH = Math.round(h * 0.065);
-      d = `M0,0 L${w},0 L${w-ti},${h-cr} Q${w-ti},${h} ${w-ti-cr},${h} L${ti+cr},${h} Q${ti},${h} ${ti},${h-cr} Z`;
-      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
-      <g clip-path="url(#b)">${crimp(2, w-2, sH, 4)}</g>`;
-      textBodyY = sH;
-
-    } else if (shapeIdx === 2) {
-      // Flat-bottom pouch — simple rounded rectangle with full-width seal
-      const cr = 5, sH = Math.round(h * 0.09);
-      d = `M${cr},0 Q0,0 0,${cr} L0,${h-cr} Q0,${h} ${cr},${h} L${w-cr},${h} Q${w},${h} ${w},${h-cr} L${w},${cr} Q${w},0 ${w-cr},0 Z`;
-      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
-      <g clip-path="url(#b)">${crimp(2, w-2, sH, 3)}</g>`;
-      textBodyY = sH;
-
-    } else {
-      // Side-fold bag — narrow top, widens toward the bottom (inverse of stand-up pouch)
-      const ti = Math.round(w * 0.05), cr = 5, sH = Math.round(h * 0.065);
-      d = `M${ti},0 L${w-ti},0 L${w},${h-cr} Q${w},${h} ${w-cr},${h} L${cr},${h} Q0,${h} 0,${h-cr} Z`;
-      sealEl = `<rect x="0" y="0" width="${w}" height="${sH}" fill="${col.seal}" clip-path="url(#b)"/>
-      <g clip-path="url(#b)">${crimp(ti+2, w-ti-2, sH, 3)}</g>`;
-      textBodyY = sH;
-    }
-
-    // Word-wrap name
-    const fontSize = 15, lineH = fontSize * 1.4;
-    const maxChars = Math.floor((w - 48) / (fontSize * 0.56));
-    const words = (name || "").split(" ");
-    const lines = [];
-    let line = "";
-    for (const word of words) {
-      const test = line ? line + " " + word : word;
-      if (test.length > maxChars && line) { lines.push(line); line = word; } else { line = test; }
-    }
-    if (line) lines.push(line);
-    const totalH = lines.length * lineH;
-    const textStartY = textBodyY + (h - textBodyY) / 2 - totalH / 2 + lineH / 2;
-    const textEls = lines.map((l, i) =>
-      `<text x="${w/2}" y="${Math.round(textStartY + i*lineH)}" text-anchor="middle" dominant-baseline="middle" fill="${col.text}" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="${fontSize}" font-weight="500">${esc(l)}</text>`
-    ).join("");
-
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${h}" viewBox="${svgViewBox}">
-      <defs><clipPath id="b"><path d="${d}"/></clipPath>${gradDef}</defs>
-      <path d="${d}" fill="${col.body}"/>
-      <rect x="0" y="0" width="${w}" height="${h}" fill="url(#sg)" clip-path="url(#b)"/>
-      ${sealEl}
-      <path d="${d}" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
-      ${extraEl}
-      ${textEls}
-    </svg>`;
-    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    // Render at 3× so the image stays sharp on retina displays in the modal
+    const scale = 3;
+    const w = PLACEHOLDER_W * scale;
+    const h = PLACEHOLDER_H * scale;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = w;
+    offscreen.height = h;
+    const octx = offscreen.getContext("2d");
+    drawBrewistBag(octx, 0, 0, w, h, number % BAG_VARIANTS.length, name);
+    return offscreen.toDataURL("image/png");
   }
 
   async function openModal(it, { pushState = true } = {}) {
