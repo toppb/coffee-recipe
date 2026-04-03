@@ -36,7 +36,7 @@ html,body{height:100%; margin:0;}
 body{
   background: var(--bg);
   overflow:hidden;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-family: 'Public Sans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   color: var(--text);
 }
 
