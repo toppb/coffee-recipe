@@ -1610,3 +1610,120 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
     white-space: nowrap;
   }
 }
+
+/* ── Share button (inside modal) ─────────────────────────────────────────── */
+.shareRule{
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.09);
+  margin: 24px 0 14px;
+}
+.shareBtn{
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid rgba(0,0,0,0.18);
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
+}
+.shareBtn:hover{
+  background: rgba(0,0,0,0.04);
+}
+.shareBtn:disabled{
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Share overlay & sheet ───────────────────────────────────────────────── */
+.shareOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.shareSheet{
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 24px;
+  width: min(480px, calc(100% - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow);
+}
+.shareSheetHeader{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.shareSheetTitle{
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sharePreviewWrap{
+  display: flex;
+  justify-content: center;
+}
+#sharePreview{
+  height: 46vh;
+  width: auto;
+  aspect-ratio: 9/16;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.shareActions{
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+.shareActionBtn{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 8px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+.shareActionBtn:hover{
+  background: rgba(0,0,0,0.04);
+}
+.shareActionBtn svg{
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+}
+@media (max-width: 760px){
+  .shareOverlay{
+    padding: 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px) + 24px);
+  }
+  .shareSheet{
+    width: 100%;
+    max-height: calc(100dvh - 48px);
+  }
+}

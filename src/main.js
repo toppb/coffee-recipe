@@ -2015,10 +2015,52 @@ async function main() {
         <div class="recipeContent" id="mRecipe">
           <div class="loading">Loading recipe...</div>
         </div>
+        <hr class="shareRule" />
+        <button class="shareBtn" id="mShare">Share Recipe</button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
+
+  // ── Share overlay ─────────────────────────────────────────────────────────
+  const shareOverlay = document.createElement("div");
+  shareOverlay.className = "shareOverlay";
+  shareOverlay.innerHTML = `
+    <div class="shareSheet">
+      <div class="shareSheetHeader">
+        <span class="shareSheetTitle">Share Recipe</span>
+        <button class="closeBtn shareClose" id="shareClose">×</button>
+      </div>
+      <div class="sharePreviewWrap">
+        <img id="sharePreview" alt="Share image preview" />
+      </div>
+      <div class="shareActions">
+        <button class="shareActionBtn" id="shareCopyLink">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 10a2.5 2.5 0 0 0 3.5.5l2.5-2a2.5 2.5 0 0 0-3.5-3.5L9 6.5"/>
+            <path d="M12 10a2.5 2.5 0 0 0-3.5-.5l-2.5 2a2.5 2.5 0 0 0 3.5 3.5L11 13.5"/>
+          </svg>
+          <span>Copy link</span>
+        </button>
+        <button class="shareActionBtn" id="shareInstagram">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="2.5" width="15" height="15" rx="4"/>
+            <circle cx="10" cy="10" r="3.2"/>
+            <circle cx="14.3" cy="5.7" r="0.8" fill="currentColor" stroke="none"/>
+          </svg>
+          <span>Instagram story</span>
+        </button>
+        <button class="shareActionBtn" id="shareDownload">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3v9m0 0-3-3m3 3 3-3"/>
+            <path d="M3.5 14.5v.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-.5"/>
+          </svg>
+          <span>Download image</span>
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(shareOverlay);
 
   const mImg = overlay.querySelector("#mImg");
   const mTitle = overlay.querySelector("#mTitle");
@@ -2181,6 +2223,167 @@ async function main() {
   let editorInstance = null;
 
   // Generates an SVG data URL of a Brewist-style coffee bag placeholder
+  async function generateShareImage(item) {
+    const W = 1080, H = 1920;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    await document.fonts.ready;
+
+    // Background
+    ctx.fillStyle = "#F6F0E6";
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Ghosted name text ───────────────────────────────────────────────────
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.10)";
+    ctx.font = "800 255px 'Bricolage Grotesque', sans-serif";
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "-5.1px";
+    ctx.textBaseline = "top";
+    const name = item.name || "";
+    const ghostMaxW = 1034;
+    const ghostWords = name.split(" ");
+    const ghostLines = [];
+    let ghostLine = "";
+    let ghostFromHyphen = false; // true when ghostLine is a remnant from hyphenation
+    for (const word of ghostWords) {
+      const testCombined = ghostLine ? ghostLine + " " + word : word;
+      if (ctx.measureText(testCombined).width <= ghostMaxW) {
+        // Fits on current line
+        ghostLine = testCombined;
+        ghostFromHyphen = false;
+      } else if (ctx.measureText(word).width > ghostMaxW) {
+        // Word alone too wide — must hyphenate
+        // Only flush ghostLine first if it came from normal word-wrap (not a hyphen remnant)
+        if (ghostLine && !ghostFromHyphen) {
+          ghostLines.push(ghostLine);
+          ghostLine = "";
+        }
+        // Continue hyphenating from current ghostLine (may be "" or a hyphen remnant like "ian")
+        let part = ghostLine ? ghostLine + " " : "";
+        ghostLine = "";
+        for (const ch of word) {
+          const withHyphen = part + ch + "-";
+          if (ctx.measureText(withHyphen).width > ghostMaxW && part.trimEnd()) {
+            ghostLines.push(part.trimEnd() + "-");
+            part = ch;
+          } else {
+            part += ch;
+          }
+        }
+        ghostLine = part;
+        ghostFromHyphen = true;
+      } else {
+        // Word fits alone but not combined — flush and start new line
+        if (ghostLine) ghostLines.push(ghostLine);
+        ghostLine = word;
+        ghostFromHyphen = false;
+      }
+    }
+    if (ghostLine) ghostLines.push(ghostLine);
+
+    // Cap at 5 lines, ellipsis on last if truncated
+    const MAX_GHOST_LINES = 5;
+    let displayGhostLines = ghostLines.slice(0, MAX_GHOST_LINES);
+    if (ghostLines.length > MAX_GHOST_LINES) {
+      let last = displayGhostLines[MAX_GHOST_LINES - 1];
+      while (last.length > 0 && ctx.measureText(last + "…").width > ghostMaxW) {
+        last = last.slice(0, -1).trimEnd();
+      }
+      displayGhostLines[MAX_GHOST_LINES - 1] = last + "…";
+    }
+
+    const ghostLineH = 255 * 0.8;
+    displayGhostLines.forEach((l, i) => ctx.fillText(l, 23, 146 + i * ghostLineH));
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    ctx.restore();
+
+    // ── Coffee bag image ────────────────────────────────────────────────────
+    const BAG_BOTTOM = 1274;
+    const BAG_TOP_MIN = 100;   // bag must not start above this y
+    const MAX_BAG_H = BAG_BOTTOM - BAG_TOP_MIN; // 1174px
+
+    // Use cached image, or fetch directly if not yet lazy-loaded
+    let bagImg = imageCache.get(item.number);
+    if (!bagImg && item.img) {
+      try {
+        const resp = await fetch(item.img);
+        const blob = await resp.blob();
+        bagImg = await createImageBitmap(blob);
+      } catch {
+        bagImg = null;
+      }
+    }
+
+    if (bagImg) {
+      const srcW = bagImg.naturalWidth || bagImg.width;
+      const srcH = bagImg.naturalHeight || bagImg.height;
+      let drawW = 600;
+      let drawH = Math.round(drawW * srcH / srcW);
+      // Cap height so the bag doesn't overflow the top of the canvas
+      if (drawH > MAX_BAG_H) {
+        drawH = MAX_BAG_H;
+        drawW = Math.round(drawH * srcW / srcH);
+      }
+      const drawX = Math.round((W - drawW) / 2);
+      const drawY = BAG_BOTTOM - drawH;
+      const cr = 24;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(drawX, drawY, drawW, drawH, cr);
+      ctx.clip();
+      ctx.drawImage(bagImg, drawX, drawY, drawW, drawH);
+      ctx.restore();
+    } else {
+      const drawW = 600;
+      const drawH = Math.round(drawW * PLACEHOLDER_H / PLACEHOLDER_W);
+      const drawX = Math.round((W - drawW) / 2);
+      const drawY = BAG_BOTTOM - drawH;
+      drawBrewistBag(ctx, drawX, drawY, drawW, drawH, item.number % BAG_VARIANTS.length, item.name);
+    }
+
+    // ── Star rating ─────────────────────────────────────────────────────────
+    const rating = item.rating || 0;
+    const STAR_Y = 1418; // center of star row (top 1374, h 88)
+    ctx.font = "800 104px 'Bricolage Grotesque', sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    // Measure a single star to manually space them for per-star colour control
+    const starW = ctx.measureText("★").width;
+    const starGap = 10;
+    const totalStarW = 5 * starW + 4 * starGap;
+    const starStartX = W / 2 - totalStarW / 2 + starW / 2;
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = i < rating ? "#000000" : "rgba(0,0,0,0.10)";
+      ctx.fillText("★", starStartX + i * (starW + starGap), STAR_Y);
+    }
+
+    // ── URL pill ────────────────────────────────────────────────────────────
+    const username = viewingProfile?.username || "";
+    const urlText = `Brewist.co/${username}/${item.number}`;
+    ctx.font = "400 48px 'Public Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const pillPadX = 40, pillPadY = 37;
+    const textW = ctx.measureText(urlText).width;
+    const pillW = textW + pillPadX * 2;
+    const pillH = 48 + pillPadY * 2;
+    const pillX = (W - pillW) / 2;
+    const PILL_Y = 1562;
+    const pillR = 34;
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(pillX, PILL_Y, pillW, pillH, pillR);
+    ctx.stroke();
+    ctx.fillStyle = "#000000";
+    ctx.fillText(urlText, W / 2, PILL_Y + pillH / 2);
+
+    return canvas;
+  }
+
   function makeBagSVG(name, number = 0) {
     // Render at 3× so the image stays sharp on retina displays in the modal
     const scale = 3;
@@ -2330,6 +2533,86 @@ async function main() {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay && !isEditing) {
       closeModal();
+    }
+  });
+
+  // ── Share button & sheet ──────────────────────────────────────────────────
+  const mShare = overlay.querySelector("#mShare");
+  let _shareCanvas = null;
+  let _shareFile = null;
+
+  function closeShareSheet() {
+    shareOverlay.style.display = "none";
+    _shareCanvas = null;
+    _shareFile = null;
+    const preview = shareOverlay.querySelector("#sharePreview");
+    if (preview) preview.src = "";
+  }
+
+  mShare.addEventListener("click", async () => {
+    const btn = mShare;
+    btn.textContent = "Generating…";
+    btn.disabled = true;
+    try {
+      _shareCanvas = await generateShareImage(currentModalItem);
+      const preview = shareOverlay.querySelector("#sharePreview");
+      preview.src = _shareCanvas.toDataURL("image/png");
+      // Pre-generate File so navigator.share() can be called synchronously on click
+      _shareFile = await new Promise((res) => {
+        _shareCanvas.toBlob((blob) => {
+          const safeName = (currentModalItem?.name || "recipe").replace(/[^a-z0-9]/gi, "-");
+          res(new File([blob], `${safeName}.png`, { type: "image/png" }));
+        }, "image/png");
+      });
+      shareOverlay.style.display = "flex";
+    } finally {
+      btn.textContent = "Share Recipe";
+      btn.disabled = false;
+    }
+  });
+
+  shareOverlay.querySelector("#shareClose").addEventListener("click", closeShareSheet);
+  shareOverlay.addEventListener("click", (e) => {
+    if (e.target === shareOverlay) closeShareSheet();
+  });
+
+  // Copy link
+  shareOverlay.querySelector("#shareCopyLink").addEventListener("click", async () => {
+    const username = viewingProfile?.username || "";
+    const url = `${window.location.origin}/${username}/${currentModalItem?.number ?? ""}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      const btn = shareOverlay.querySelector("#shareCopyLink span:last-child");
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    } catch { /* ignore */ }
+  });
+
+  // Download image
+  function triggerShareDownload() {
+    if (!_shareFile) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(_shareFile);
+    a.download = _shareFile.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  shareOverlay.querySelector("#shareDownload").addEventListener("click", triggerShareDownload);
+
+  // Instagram story — Web Share API on mobile (called synchronously to preserve user gesture)
+  shareOverlay.querySelector("#shareInstagram").addEventListener("click", () => {
+    if (!_shareFile) return;
+    if (navigator.canShare?.({ files: [_shareFile] })) {
+      // Synchronous call preserves the iOS user gesture requirement
+      navigator.share({ files: [_shareFile] }).catch(() => { /* cancelled */ });
+    } else {
+      // Desktop fallback: download the image
+      triggerShareDownload();
+      const btn = shareOverlay.querySelector("#shareInstagram span:last-child");
+      const orig = btn.textContent;
+      btn.textContent = "Image saved — upload to Instagram";
+      setTimeout(() => { btn.textContent = orig; }, 3500);
     }
   });
 
