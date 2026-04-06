@@ -4,6 +4,16 @@ A multi-user coffee recipe platform. Sign up, get your own canvas at `brewist.co
 
 ## ✨ Features
 
+### V5 – Social Sharing
+
+- **Share Recipe**: Every recipe modal has a "Share Recipe" button at the bottom.
+- **Social Image Generation**: Clicking it generates a 1080×1920 Instagram Story–sized image on the fly — featuring the coffee bag photo, a large ghosted recipe name in the background, star rating, and a `Brewist.co/username/number` URL pill.
+- **Share Sheet**: A clean preview of the generated image appears with three actions:
+  - **Copy link** — copies the direct recipe URL to clipboard.
+  - **Instagram story** — uses the Web Share API to open the native iOS/Android share sheet with the image pre-attached (tap Instagram → Add to Story). Requires HTTPS.
+  - **Download image** — saves the 1080×1920 PNG to your device.
+- **PWA Icons**: App icon configured for iOS and Android home screen shortcuts via `apple-touch-icon` and `manifest.json`.
+
 ### V4 – Multi-User Platform
 
 - **Sign Up / Sign In**: Anyone can create an account with a username and get their own canvas at `/#/username`.
