@@ -17,7 +17,7 @@ async function resizeImage(file, maxWidth = 600, quality = 0.85) {
       canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
       canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
+        if (blob) resolve({ blob, width: w, height: h });
         else reject(new Error("Image conversion failed"));
       }, "image/webp", quality);
     };
@@ -494,6 +494,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
           rating: item.rating || null,
           tags: item.tags || [],
           img_url: newImgUrl,
+          img_width: item.img_width || null,
+          img_height: item.img_height || null,
           notes: item.notes || [],
           brewer: item.brewer || [],
           grinder: item.grinder || [],
@@ -522,6 +524,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
           rating: inserted.rating,
           tags: inserted.tags || [],
           img: inserted.img_url || "",
+          img_width: inserted.img_width || null,
+          img_height: inserted.img_height || null,
           roaster: inserted.roaster || "",
           origin: inserted.origin || "",
           process: inserted.process || "",
@@ -599,13 +603,15 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
     saveBtn.textContent = "Saving\u2026";
 
     let imgUrl = item?.img || "";
+    let imgWidth = item?.img_width || null;
+    let imgHeight = item?.img_height || null;
     const file = fileInput.files?.[0];
     if (file && file.size) {
       const number = item?.number || 0;
       const path = `${userId}/coffee-bag-${pad2(number || Date.now())}.webp`;
-      let blob;
+      let blob, width, height;
       try {
-        blob = await resizeImage(file);
+        ({ blob, width, height } = await resizeImage(file));
       } catch {
         errEl.textContent = "Image processing failed.";
         saveBtn.disabled = false;
@@ -624,6 +630,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
       }
       const { data } = supabase.storage.from("coffee-bags").getPublicUrl(path);
       imgUrl = data.publicUrl;
+      imgWidth = width;
+      imgHeight = height;
     }
 
     const recipeMarkdown = tiptapEditor.getMarkdown ? tiptapEditor.getMarkdown() : tiptapEditor.storage.markdown.getMarkdown();
@@ -634,6 +642,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
       rating: ratingVal || null,
       tags: getTagValues(),
       img_url: imgUrl || null,
+      img_width: imgWidth,
+      img_height: imgHeight,
       notes: getNotesValues(),
       brewer: getBrewerValues(),
       grinder: getGrinderValues(),
@@ -676,6 +686,8 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
         rating: inserted.rating,
         tags: inserted.tags || [],
         img: inserted.img_url || "",
+        img_width: inserted.img_width || null,
+        img_height: inserted.img_height || null,
         roaster: inserted.roaster || "",
         origin: inserted.origin || "",
         process: inserted.process || "",

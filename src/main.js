@@ -212,6 +212,7 @@ async function main() {
       return rows.map((r) => ({
         id: r.id, number: r.number, name: r.name, rating: r.rating,
         tags: r.tags || [], img: r.img_url || "",
+        img_width: r.img_width || null, img_height: r.img_height || null,
         roaster: r.roaster || "", origin: r.origin || "",
         process: r.process || "", notes: r.notes || [],
         brew: r.brew || "", brewer: r.brewer || [],
@@ -554,6 +555,23 @@ async function main() {
 
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Draw an image into a slot preserving its aspect ratio (contain-fit).
+  // Safety net: with full dimension preload the slot should already match, but a
+  // letterbox is far less ugly than a squish if it ever doesn't.
+  function drawImageContain(img, x, y, w, h) {
+    const slotAR = h / w;
+    const imgAR = img.height / img.width;
+    let dW = w, dH = h, dX = x, dY = y;
+    if (imgAR > slotAR) {
+      dW = h / imgAR;
+      dX = x + (w - dW) / 2;
+    } else if (imgAR < slotAR) {
+      dH = w * imgAR;
+      dY = y + (h - dH) / 2;
+    }
+    ctx.drawImage(img, dX, dY, dW, dH);
+  }
+
   async function loadImageToCache(itemNumber, src) {
     if (!src) {
       // No image — give it placeholder dimensions so it appears in the layout
@@ -604,13 +622,14 @@ async function main() {
 
   const imageLoadingSet = new Set();
 
-  // Set placeholder dimensions for all items immediately so layout can proceed
+  // Seed dimensions for every item so layout can proceed. Prefer the dims stored on the
+  // recipe record (img_width / img_height) — this lets off-screen bags get correctly-shaped
+  // slots without downloading the image, which avoids squishing on initial render and
+  // keeps Supabase Storage egress proportional to what's actually on screen.
   baseItems.forEach((item) => {
-    imageDimensions.set(item.number, {
-      width: PLACEHOLDER_W,
-      height: PLACEHOLDER_H,
-      aspectRatio: PLACEHOLDER_H / PLACEHOLDER_W,
-    });
+    const w = item.img_width && item.img_height ? item.img_width : PLACEHOLDER_W;
+    const h = item.img_width && item.img_height ? item.img_height : PLACEHOLDER_H;
+    imageDimensions.set(item.number, { width: w, height: h, aspectRatio: h / w });
   });
 
   // Create masonry layout for a tile using actual image sizes
@@ -740,7 +759,9 @@ async function main() {
   }
   centerOnFirstBag();
 
-  // Load images for the initially visible viewport, then rebuild layout with real dimensions
+  // Load images for the initially visible viewport, then rebuild layout with real dimensions.
+  // Off-screen bags use dimensions seeded from the recipe record (img_width/img_height) so
+  // their slots match their true aspect ratio without an image fetch.
   {
     const viewLeft = camX - 200;
     const viewRight = camX + canvasWidth + 200;
@@ -778,7 +799,6 @@ async function main() {
       return Promise.resolve();
     }));
 
-    // Rebuild with real dimensions for the initial viewport items
     tileItems = createTileLayout();
     centerOnFirstBag();
   }
@@ -951,15 +971,14 @@ async function main() {
               ctx.globalAlpha = searchTransitionAlpha;
               
               if (isHovered && hoverScale > 1.001) {
-                // Draw with scale effect
                 const scale = hoverScale;
                 const scaledW = item.width * scale;
                 const scaledH = item.height * scale;
                 const offsetX = (scaledW - item.width) / 2;
                 const offsetY = (scaledH - item.height) / 2;
-                ctx.drawImage(img, screenX - offsetX, screenY - offsetY, scaledW, scaledH);
+                drawImageContain(img, screenX - offsetX, screenY - offsetY, scaledW, scaledH);
               } else {
-                ctx.drawImage(img, screenX, screenY, item.width, item.height);
+                drawImageContain(img, screenX, screenY, item.width, item.height);
               }
               
               ctx.globalAlpha = 1;
