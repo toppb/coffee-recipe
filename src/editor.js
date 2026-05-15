@@ -451,7 +451,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
     <button type="button" class="editor-bg-warning-close" aria-label="Clear image">&times;</button>
     <p class="editor-bg-warning-text">Heads up! This photo has a background. Transparent PNGs look best on the canvas.</p>
     <div class="editor-bg-warning-actions">
-      <button type="button" class="editor-bg-warning-use">Use anyway</button>
+      <button type="button" class="editor-bg-warning-use">Use as-is</button>
       <a class="editor-bg-warning-remove" href="https://www.remove.bg/upload" target="_blank" rel="noopener noreferrer">Remove background</a>
     </div>
   `;
