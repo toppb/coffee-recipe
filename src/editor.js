@@ -33,12 +33,12 @@ async function detectSolidBackground(file) {
             }
           }
         }
-        const similar = maxDelta < 16;
-        // Whiteness: average across opaque samples
+        const similar = maxDelta < 48;
+        // Light/uniform background: average across opaque samples
         let r = 0, g = 0, b = 0;
         opaque.forEach((p) => { r += p[0]; g += p[1]; b += p[2]; });
         r /= opaque.length; g /= opaque.length; b /= opaque.length;
-        const white = r > 245 && g > 245 && b > 245;
+        const white = r > 200 && g > 200 && b > 200;
         resolve({ solid: similar || white, white });
       } catch {
         resolve(null);
