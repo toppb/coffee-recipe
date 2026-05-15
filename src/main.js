@@ -1709,6 +1709,9 @@ async function main() {
           "Your personal canvas of coffee recipes";
         landingPage.querySelector(".landing-card").style.display = "";
         authBtn.style.display = "none";
+        // Owner/visitor empty overlays don't apply on the landing page.
+        emptyCanvasOverlay.style.display = "none";
+        emptyVisitorOverlay.style.display = "none";
         await supabase.auth.signOut();
         history.pushState({}, '', '/');
         // Reload featured user's coffees as background
