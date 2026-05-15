@@ -1343,7 +1343,7 @@ async function main() {
   progressNudge.innerHTML = `
     <span class="progress-nudge-dots"></span>
     <span class="progress-nudge-text"></span>
-    <button type="button" class="progress-nudge-cta">Add coffee</button>
+    <button type="button" class="progress-nudge-cta">Add recipe</button>
     <button type="button" class="progress-nudge-dismiss" aria-label="Dismiss">&times;</button>
   `;
   document.body.appendChild(progressNudge);
@@ -1380,8 +1380,8 @@ async function main() {
     dotsEl.textContent = dots;
     const remaining = PROGRESS_GOAL - count;
     textEl.textContent = remaining === 1
-      ? "Almost there — 1 more to make your shelf pop."
-      : `Looking good. Add ${remaining} more to fill your shelf.`;
+      ? "Almost there. Add 1 more to fill the canvas."
+      : `Looking good. Add ${remaining} more to fill the canvas.`;
     progressNudge.style.display = "flex";
   }
   // Expose so other update paths (reloadCanvasData, auth flips) can re-evaluate
