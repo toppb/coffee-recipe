@@ -4,6 +4,13 @@ A multi-user coffee recipe platform. Sign up, get your own canvas at `brewist.co
 
 ## ✨ Features
 
+### V5.1 – Onboarding Nudges & Background Removal
+
+- **Background Image Remover**: When a user uploads a coffee bag photo with a non-transparent background, the editor detects it (corner-pixel sampling) and offers one-click background removal via the [remove.bg](https://www.remove.bg/) API. The cutout PNG is fetched server-side through `/api/remove-bg` and swapped straight into the editor.
+- **Per-User Caps**: Monthly usage is tracked in `bg_removal_usage` with a default cap of 5 per user (configurable, with per-user overrides) and a global daily safety cap.
+- **Clipboard Fallback**: If the cap is reached or the upstream errors, the image is copied to the user's clipboard and the panel surfaces an "Open Remove.bg" link so they can paste and finish manually.
+- **Progress Nudge**: Owners with 1–2 recipes see a dismissible progress bar ("Add 2 more to fill your shelf") nudging them past the lonely first-recipe stage. Hidden once they hit 3 recipes; per-user dismissal persists in `localStorage`.
+
 ### V5 – Social Sharing
 
 - **Share Recipe**: Every recipe modal has a "Share Recipe" button at the bottom.
