@@ -771,11 +771,12 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   color: rgba(0, 0, 0, 0.9);
 }
 
-/* Progress nudge bar — owner-only, 1–2 recipes */
+/* Progress nudge bar — owner-only, 1–2 recipes.
+   Sits above the bottom-pinned search bar (search bar: 16px from bottom + 56px tall). */
 .progress-nudge{
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: flex;
   align-items: center;
