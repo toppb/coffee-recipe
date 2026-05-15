@@ -1335,6 +1335,59 @@ async function main() {
     }
   }
 
+  // Progress nudge bar — owner-only, shown when they have 1–2 recipes
+  const PROGRESS_GOAL = 3;
+  const progressNudge = document.createElement("div");
+  progressNudge.className = "progress-nudge";
+  progressNudge.style.display = "none";
+  progressNudge.innerHTML = `
+    <span class="progress-nudge-dots"></span>
+    <span class="progress-nudge-text"></span>
+    <button type="button" class="progress-nudge-cta">Add coffee</button>
+    <button type="button" class="progress-nudge-dismiss" aria-label="Dismiss">&times;</button>
+  `;
+  document.body.appendChild(progressNudge);
+  progressNudge.querySelector(".progress-nudge-cta").addEventListener("click", () => openEditor(null));
+  progressNudge.querySelector(".progress-nudge-dismiss").addEventListener("click", () => {
+    const key = progressNudgeKey();
+    if (key) try { localStorage.setItem(key, "1"); } catch {}
+    progressNudge.style.display = "none";
+  });
+
+  function progressNudgeKey() {
+    const uid = authSession?.user?.id;
+    return uid ? `brewist:nudge-dismissed:${uid}` : null;
+  }
+
+  function updateProgressNudge() {
+    const count = baseItems.length;
+    const key = progressNudgeKey();
+    let dismissed = false;
+    if (key) try { dismissed = localStorage.getItem(key) === "1"; } catch {}
+    // Re-evaluate dynamically: landing page is showing, no auth session,
+    // or viewing someone else's canvas → hide.
+    const landingShown = landingPage && landingPage.style.display !== "none";
+    const viewingOwnCanvas =
+      !!authSession && !!currentUserProfile && viewingUserId === currentUserProfile.id;
+    const shouldShow =
+      !landingShown && !isNotFound && viewingOwnCanvas &&
+      count > 0 && count < PROGRESS_GOAL && !dismissed;
+    if (!shouldShow) { progressNudge.style.display = "none"; return; }
+    const dotsEl = progressNudge.querySelector(".progress-nudge-dots");
+    const textEl = progressNudge.querySelector(".progress-nudge-text");
+    let dots = "";
+    for (let i = 0; i < PROGRESS_GOAL; i++) dots += i < count ? "●" : "○";
+    dotsEl.textContent = dots;
+    const remaining = PROGRESS_GOAL - count;
+    textEl.textContent = remaining === 1
+      ? "Almost there — 1 more to make your shelf pop."
+      : `Looking good. Add ${remaining} more to fill your shelf.`;
+    progressNudge.style.display = "flex";
+  }
+  // Expose so other update paths (reloadCanvasData, auth flips) can re-evaluate
+  window.__brewistUpdateProgressNudge = updateProgressNudge;
+  updateProgressNudge();
+
   noMatchOverlay.querySelector(".no-match-show-all-btn").addEventListener("click", () => {
     searchQuery = "";
     searchInput.value = "";
@@ -1430,6 +1483,7 @@ async function main() {
     noMatchOverlay.style.display = "none";
     emptyCanvasOverlay.style.display = baseItems.length === 0 && isOwner ? "flex" : "none";
     emptyVisitorOverlay.style.display = baseItems.length === 0 && !isOwner ? "flex" : "none";
+    if (typeof window.__brewistUpdateProgressNudge === "function") window.__brewistUpdateProgressNudge();
   }
 
   // ── Auth UI (signup + signin) ─────────────────────────────────────────
@@ -1642,6 +1696,7 @@ async function main() {
       }
       updateAuthUI();
       if (typeof updateAddBtnVisibility === "function") updateAddBtnVisibility();
+      if (typeof window.__brewistUpdateProgressNudge === "function") window.__brewistUpdateProgressNudge();
     });
 
     // Auth button — log out or open sign-in modal
@@ -1670,6 +1725,7 @@ async function main() {
           await Promise.all(baseItems.map((item) => loadImageToCache(item.number, item.img)));
           tileItems = createTileLayout();
         }
+        if (typeof window.__brewistUpdateProgressNudge === "function") window.__brewistUpdateProgressNudge();
       } else {
         openAuthModal(false);
       }
@@ -2683,6 +2739,7 @@ async function main() {
         lastHoveredItem = null;
         emptyCanvasOverlay.style.display = "none";
         emptyVisitorOverlay.style.display = "none";
+        if (typeof window.__brewistUpdateProgressNudge === "function") window.__brewistUpdateProgressNudge();
 
         isEditing = false;
         editorInstance = null;
@@ -2720,6 +2777,7 @@ async function main() {
         duplicatedItems = createDuplicatedItems(filteredBaseItems);
         tileItems = createTileLayout();
         imageCache.delete(deletedItem.number);
+        if (typeof window.__brewistUpdateProgressNudge === "function") window.__brewistUpdateProgressNudge();
         closeModal();
       },
     });

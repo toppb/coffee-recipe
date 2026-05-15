@@ -2,6 +2,96 @@ import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 
+// Detect whether an image has a solid (non-transparent) background.
+// Samples 4 corners + 4 edge midpoints. Returns { solid: bool, white: bool } or null on error.
+async function detectSolidBackground(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const size = 64;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, size, size);
+        const pts = [
+          [0, 0], [size - 1, 0], [0, size - 1], [size - 1, size - 1],
+          [size >> 1, 0], [size >> 1, size - 1], [0, size >> 1], [size - 1, size >> 1],
+        ];
+        const samples = pts.map(([x, y]) => ctx.getImageData(x, y, 1, 1).data);
+        const opaque = samples.filter((p) => p[3] > 250);
+        if (opaque.length < 6) { resolve({ solid: false, white: false }); return; }
+        // Mutual similarity: max channel delta across opaque samples
+        let maxDelta = 0;
+        for (let i = 0; i < opaque.length; i++) {
+          for (let j = i + 1; j < opaque.length; j++) {
+            for (let c = 0; c < 3; c++) {
+              const d = Math.abs(opaque[i][c] - opaque[j][c]);
+              if (d > maxDelta) maxDelta = d;
+            }
+          }
+        }
+        const similar = maxDelta < 16;
+        // Whiteness: average across opaque samples
+        let r = 0, g = 0, b = 0;
+        opaque.forEach((p) => { r += p[0]; g += p[1]; b += p[2]; });
+        r /= opaque.length; g /= opaque.length; b /= opaque.length;
+        const white = r > 245 && g > 245 && b > 245;
+        resolve({ solid: similar || white, white });
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+// Resize an image File and return a base64-encoded JPEG (no data URL prefix).
+// Used to keep payloads small when calling the remove.bg proxy.
+async function resizeImageToBase64(file, maxWidth = 1500, quality = 0.9) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.naturalWidth);
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      // toDataURL → strip "data:image/jpeg;base64,"
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      const b64 = dataUrl.split(",")[1] || "";
+      if (!b64) reject(new Error("encode failed"));
+      else resolve(b64);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image load failed")); };
+    img.src = url;
+  });
+}
+
+// Convert any image File to a PNG Blob (for clipboard, which only reliably accepts PNG).
+async function fileToPngBlob(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("png convert failed")), "image/png");
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image load failed")); };
+    img.src = url;
+  });
+}
+
 // Resize and compress an image file to max 600px wide, output as WebP
 async function resizeImage(file, maxWidth = 600, quality = 0.85) {
   return new Promise((resolve, reject) => {
@@ -352,16 +442,165 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   fileInput.type = "file";
   fileInput.accept = "image/png,image/jpeg,image/webp";
   fileInput.style.display = "none";
-  fileInput.addEventListener("change", () => {
-    const file = fileInput.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      imgEl.src = url;
-      imgEl.style.display = "";
-      imgSection.classList.remove("editor-image--empty");
-      imgOverlay.dataset.label = "Change image";
-      if (imgHint) imgHint.style.display = "none";
+
+  // Coaching panel for non-transparent backgrounds
+  const bgWarning = document.createElement("div");
+  bgWarning.className = "editor-bg-warning";
+  bgWarning.style.display = "none";
+  bgWarning.innerHTML = `
+    <button type="button" class="editor-bg-warning-close" aria-label="Clear image">&times;</button>
+    <p class="editor-bg-warning-text">Heads up! This photo has a background. Transparent PNGs look best on the canvas.</p>
+    <div class="editor-bg-warning-actions">
+      <button type="button" class="editor-bg-warning-use">Use anyway</button>
+      <a class="editor-bg-warning-remove" href="https://www.remove.bg/upload" target="_blank" rel="noopener noreferrer">Remove background</a>
+    </div>
+  `;
+  bgWarning.querySelector(".editor-bg-warning-use").addEventListener("click", () => {
+    bgWarning.style.display = "none";
+  });
+
+  // Cached PNG of the picked file — populated as soon as a flagged image is
+  // detected, so the "Remove background" link can copy to clipboard instantly.
+  let pendingPngBlobPromise = null;
+
+  const removeLink = bgWarning.querySelector(".editor-bg-warning-remove");
+  const warningTextEl = bgWarning.querySelector(".editor-bg-warning-text");
+  const originalWarningText = warningTextEl.textContent;
+  // When true, the click handler stops intercepting so the user's click opens
+  // Remove.bg via the default anchor behavior. Reset when a new file is picked.
+  let inFallbackMode = false;
+
+  async function clipboardHandoff(originalLinkText, reason) {
+    const prefix = reason ? `${reason}. ` : "";
+    if (!pendingPngBlobPromise || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      warningTextEl.textContent = `${prefix}Open Remove.bg and upload your image to manually remove background.`;
+      removeLink.textContent = "Open Remove.bg ↗";
+      inFallbackMode = true;
+      return;
     }
+    try {
+      const item = new ClipboardItem({ "image/png": pendingPngBlobPromise });
+      await navigator.clipboard.write([item]);
+      warningTextEl.textContent = `${prefix}Image copied. Open Remove.bg and paste to manually remove background.`;
+    } catch {
+      warningTextEl.textContent = `${prefix}Open Remove.bg and upload your image to manually remove background.`;
+    }
+    removeLink.textContent = "Open Remove.bg ↗";
+    inFallbackMode = true;
+  }
+
+  removeLink.addEventListener("click", async (e) => {
+    if (inFallbackMode) {
+      // Let the anchor's target="_blank" open Remove.bg on the user's click.
+      return;
+    }
+    e.preventDefault();
+    const originalText = removeLink.textContent;
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    // Try the in-app proxy first.
+    removeLink.textContent = "Removing background…";
+    removeLink.classList.add("is-loading");
+    try {
+      const session = (await supabase?.auth.getSession())?.data?.session;
+      if (!session?.access_token) throw new Error("no_session");
+
+      const b64 = await resizeImageToBase64(file, 1500, 0.9);
+      const resp = await fetch("/api/remove-bg", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ image_b64: b64 }),
+      });
+
+      if (resp.ok) {
+        const pngBlob = await resp.blob();
+        const cutoutFile = new File([pngBlob], "cutout.png", { type: "image/png" });
+        const dt = new DataTransfer();
+        dt.items.add(cutoutFile);
+        fileInput.files = dt.files;
+        const url = URL.createObjectURL(pngBlob);
+        imgEl.src = url;
+        imgEl.style.display = "";
+        imgSection.classList.remove("editor-image--empty");
+        imgOverlay.dataset.label = "Change image";
+        if (imgHint) imgHint.style.display = "none";
+        bgWarning.style.display = "none";
+        removeLink.textContent = originalText;
+        removeLink.classList.remove("is-loading");
+        pendingPngBlobPromise = Promise.resolve(pngBlob);
+        return;
+      }
+
+      // 429 → cap hit; anything else → upstream/server problem. Fall back to clipboard.
+      let reasonText = "Try again later";
+      if (resp.status === 429) {
+        const body = await resp.json().catch(() => ({}));
+        reasonText = body.reason === "user_cap_reached" ? "Monthly limit reached" : "Daily limit reached";
+      }
+      removeLink.classList.remove("is-loading");
+      await clipboardHandoff(originalText, reasonText);
+    } catch {
+      removeLink.classList.remove("is-loading");
+      await clipboardHandoff(originalText, null);
+    }
+  });
+
+  // Snapshot of the image state before the user picked a new file, so the
+  // close button can revert to whatever was there originally.
+  let preChangeState = null;
+
+  bgWarning.querySelector(".editor-bg-warning-close").addEventListener("click", () => {
+    bgWarning.style.display = "none";
+    fileInput.value = "";
+    if (!preChangeState) return;
+    const prev = preChangeState;
+    if (prev.src) {
+      imgEl.src = prev.src;
+      imgEl.style.display = prev.display;
+    } else {
+      imgEl.removeAttribute("src");
+      imgEl.style.display = "none";
+    }
+    imgSection.classList.toggle("editor-image--empty", prev.empty);
+    imgOverlay.dataset.label = prev.overlayLabel;
+    if (imgHint) imgHint.style.display = prev.hintDisplay;
+  });
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    preChangeState = {
+      src: imgEl.getAttribute("src") || "",
+      display: imgEl.style.display,
+      empty: imgSection.classList.contains("editor-image--empty"),
+      overlayLabel: imgOverlay.dataset.label,
+      hintDisplay: imgHint ? imgHint.style.display : "",
+    };
+    const url = URL.createObjectURL(file);
+    imgEl.src = url;
+    imgEl.style.display = "";
+    imgSection.classList.remove("editor-image--empty");
+    imgOverlay.dataset.label = "Change image";
+    if (imgHint) imgHint.style.display = "none";
+    bgWarning.style.display = "none";
+    pendingPngBlobPromise = null;
+    // Reset fallback state and any leftover copy from a previous picked file.
+    inFallbackMode = false;
+    warningTextEl.textContent = originalWarningText;
+    removeLink.textContent = "Remove background";
+    removeLink.classList.remove("is-loading");
+    try {
+      const result = await detectSolidBackground(file);
+      if (result && result.solid) {
+        bgWarning.style.display = "";
+        // Kick off PNG conversion in parallel so it's ready when the user clicks "Remove background".
+        pendingPngBlobPromise = fileToPngBlob(file).catch(() => null);
+      }
+    } catch { /* non-fatal */ }
   });
   imgSection.appendChild(fileInput);
 
@@ -370,6 +609,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   scrollArea.className = "editor-scroll";
 
   scrollArea.appendChild(imgSection);
+  scrollArea.appendChild(bgWarning);
 
   // Title
   const titleInput = document.createElement("input");
