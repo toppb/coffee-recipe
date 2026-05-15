@@ -1343,7 +1343,7 @@ async function main() {
   progressNudge.innerHTML = `
     <span class="progress-nudge-dots"></span>
     <span class="progress-nudge-text"></span>
-    <button type="button" class="progress-nudge-cta">Add recipe</button>
+    <button type="button" class="progress-nudge-cta">Add</button>
     <button type="button" class="progress-nudge-dismiss" aria-label="Dismiss">&times;</button>
   `;
   document.body.appendChild(progressNudge);
@@ -1360,7 +1360,7 @@ async function main() {
   }
 
   function updateProgressNudge() {
-    const count = baseItems.length;
+    let count = baseItems.length;
     const key = progressNudgeKey();
     let dismissed = false;
     if (key) try { dismissed = localStorage.getItem(key) === "1"; } catch {}
@@ -1369,9 +1369,14 @@ async function main() {
     const landingShown = landingPage && landingPage.style.display !== "none";
     const viewingOwnCanvas =
       !!authSession && !!currentUserProfile && viewingUserId === currentUserProfile.id;
-    const shouldShow =
+    // ?nudge=N debug override: force render the nudge with N recipes remaining.
+    const remainingOverride = parseInt(new URLSearchParams(location.search).get("nudge") || "", 10);
+    const debugForce = Number.isFinite(remainingOverride) && remainingOverride >= 1 && remainingOverride < PROGRESS_GOAL;
+    if (debugForce) count = PROGRESS_GOAL - remainingOverride;
+    const shouldShow = debugForce || (
       !landingShown && !isNotFound && viewingOwnCanvas &&
-      count > 0 && count < PROGRESS_GOAL && !dismissed;
+      count > 0 && count < PROGRESS_GOAL && !dismissed
+    );
     if (!shouldShow) { progressNudge.style.display = "none"; return; }
     const dotsEl = progressNudge.querySelector(".progress-nudge-dots");
     const textEl = progressNudge.querySelector(".progress-nudge-text");
@@ -1380,8 +1385,8 @@ async function main() {
     dotsEl.textContent = dots;
     const remaining = PROGRESS_GOAL - count;
     textEl.textContent = remaining === 1
-      ? "Almost there. Add 1 more to fill the canvas."
-      : `Looking good. Add ${remaining} more to fill the canvas.`;
+      ? "Almost there. Add 1 more recipe."
+      : `Add ${remaining} more recipes to fill your canvas.`;
     progressNudge.style.display = "flex";
   }
   // Expose so other update paths (reloadCanvasData, auth flips) can re-evaluate
