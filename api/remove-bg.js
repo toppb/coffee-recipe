@@ -19,8 +19,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "misconfigured" });
   }
 
-  const userCap = parseInt(process.env.REMOVEBG_USER_MONTHLY_CAP || "5", 10);
+  const defaultUserCap = parseInt(process.env.REMOVEBG_USER_MONTHLY_CAP || "5", 10);
   const globalCap = parseInt(process.env.REMOVEBG_GLOBAL_DAILY_CAP || "200", 10);
+  // Per-user overrides: "uuid:cap,uuid:cap". Parsed once per cold start.
+  const overrides = Object.fromEntries(
+    (process.env.REMOVEBG_USER_CAP_OVERRIDES || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((pair) => {
+        const [id, cap] = pair.split(":").map((s) => s.trim());
+        return [id, parseInt(cap, 10)];
+      })
+      .filter(([id, cap]) => id && Number.isFinite(cap))
+  );
 
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -54,6 +66,7 @@ export default async function handler(req, res) {
       .maybeSingle(),
   ]);
 
+  const userCap = overrides[userId] ?? defaultUserCap;
   if ((userRow?.count ?? 0) >= userCap) {
     return res
       .status(429)
