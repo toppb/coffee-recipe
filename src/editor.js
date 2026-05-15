@@ -428,7 +428,26 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   const imgOverlay = document.createElement("span");
   imgOverlay.className = "editor-image-overlay";
   imgOverlay.dataset.label = item?.img ? "Change image" : "Add image";
+
+  const overlayChangeBtn = document.createElement("span");
+  overlayChangeBtn.className = "editor-image-overlay-change";
+  overlayChangeBtn.textContent = imgOverlay.dataset.label;
+  imgOverlay.appendChild(overlayChangeBtn);
+
+  const overlayDeleteBtn = document.createElement("button");
+  overlayDeleteBtn.type = "button";
+  overlayDeleteBtn.className = "editor-image-overlay-delete";
+  overlayDeleteBtn.textContent = "Delete";
+  imgOverlay.appendChild(overlayDeleteBtn);
+
   imgSection.appendChild(imgOverlay);
+
+  // Keep the visible pill text in sync with the dataset label so existing
+  // updates throughout the file (which set dataset.label) still work.
+  const setOverlayLabel = (label) => {
+    imgOverlay.dataset.label = label;
+    overlayChangeBtn.textContent = label;
+  };
 
   let imgHint = null;
   if (isNew) {
@@ -442,6 +461,10 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
   fileInput.type = "file";
   fileInput.accept = "image/png,image/jpeg,image/webp";
   fileInput.style.display = "none";
+  // Insert as the first labelable descendant of imgSection so clicking the
+  // label activates the file picker — otherwise the Delete <button> would
+  // claim that role and a tap anywhere on the image area would delete.
+  imgSection.insertBefore(fileInput, imgSection.firstChild);
 
   // Coaching panel for non-transparent backgrounds
   const bgWarning = document.createElement("div");
@@ -526,7 +549,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
         imgEl.src = url;
         imgEl.style.display = "";
         imgSection.classList.remove("editor-image--empty");
-        imgOverlay.dataset.label = "Change image";
+        setOverlayLabel("Change image");
         if (imgHint) imgHint.style.display = "none";
         bgWarning.style.display = "none";
         removeLink.textContent = originalText;
@@ -566,7 +589,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
       imgEl.style.display = "none";
     }
     imgSection.classList.toggle("editor-image--empty", prev.empty);
-    imgOverlay.dataset.label = prev.overlayLabel;
+    setOverlayLabel(prev.overlayLabel);
     if (imgHint) imgHint.style.display = prev.hintDisplay;
   });
 
@@ -584,7 +607,7 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
     imgEl.src = url;
     imgEl.style.display = "";
     imgSection.classList.remove("editor-image--empty");
-    imgOverlay.dataset.label = "Change image";
+    setOverlayLabel("Change image");
     if (imgHint) imgHint.style.display = "none";
     bgWarning.style.display = "none";
     pendingPngBlobPromise = null;
@@ -602,7 +625,41 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
       }
     } catch { /* non-fatal */ }
   });
-  imgSection.appendChild(fileInput);
+
+  // Delete image — clears the current photo back to the placeholder.
+  let deleteImg = false;
+  const updateDeleteBtnVisibility = () => {
+    const hasPicked = !!fileInput.files?.[0];
+    const hasSavedImg = !!item?.img && !deleteImg;
+    overlayDeleteBtn.style.display = (hasPicked || hasSavedImg) ? "" : "none";
+  };
+  updateDeleteBtnVisibility();
+  overlayDeleteBtn.addEventListener("click", (e) => {
+    // Prevent the label from forwarding the click to the file input.
+    e.preventDefault();
+    e.stopPropagation();
+    deleteImg = true;
+    fileInput.value = "";
+    pendingPngBlobPromise = null;
+    bgWarning.style.display = "none";
+    if (placeholderSrc) {
+      imgEl.onerror = null;
+      imgEl.src = placeholderSrc;
+      imgEl.style.display = "";
+      imgSection.classList.remove("editor-image--empty");
+    } else {
+      imgEl.removeAttribute("src");
+      imgEl.style.display = "none";
+      imgSection.classList.add("editor-image--empty");
+    }
+    setOverlayLabel("Add image");
+    if (imgHint) imgHint.style.display = "";
+    updateDeleteBtnVisibility();
+  });
+  fileInput.addEventListener("change", () => {
+    deleteImg = false;
+    updateDeleteBtnVisibility();
+  });
 
   // Scrollable content wrapper (everything except footer)
   const scrollArea = document.createElement("div");
@@ -846,6 +903,11 @@ export function createCoffeeEditor(modalEl, { item, supabase, pad2, suggestions,
     let imgWidth = item?.img_width || null;
     let imgHeight = item?.img_height || null;
     const file = fileInput.files?.[0];
+    if (deleteImg && !(file && file.size)) {
+      imgUrl = "";
+      imgWidth = null;
+      imgHeight = null;
+    }
     if (file && file.size) {
       const number = item?.number || 0;
       const path = `${userId}/coffee-bag-${pad2(number || Date.now())}.webp`;

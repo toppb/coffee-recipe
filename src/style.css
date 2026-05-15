@@ -1172,15 +1172,44 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   transition: opacity .15s ease;
   pointer-events: none;
 }
-.editor-image-overlay::after{
-  content: attr(data-label);
+.editor-image-overlay{
+  flex-direction: column;
+  gap: 10px;
+}
+.editor-image-overlay-change,
+.editor-image-overlay-delete{
+  box-sizing: border-box;
+  width: 140px;
   padding: 7px 16px;
+  background: transparent;
   border: 1.5px solid rgba(255,255,255,.8);
   border-radius: 8px;
   color: #fff;
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
+  font-style: normal;
+  line-height: normal;
+  text-align: center;
+  cursor: pointer;
+  /* Don't intercept taps when the overlay isn't visible — otherwise on touch
+     devices, where there's no hover, any tap on the image area lands on a
+     pill instead of opening the file picker. */
+  pointer-events: none;
+}
+.editor-image-overlay-change{ order: 1; }
+.editor-image-overlay-delete{ order: 2; }
+.editor-image:hover .editor-image-overlay-change,
+.editor-image:hover .editor-image-overlay-delete,
+.editor-image--empty .editor-image-overlay-change{
+  pointer-events: auto;
+}
+.editor-image-overlay-change:hover,
+.editor-image-overlay-delete:hover{
+  background: rgba(255,255,255,.15);
+}
+.editor-image--empty .editor-image-overlay-delete{
+  display: none !important;
 }
 .editor-image:hover .editor-image-overlay{
   opacity: 1;
@@ -1190,9 +1219,12 @@ h2{ margin:0; font-size: 20px; line-height:1.2; }
   opacity: 1;
   background: transparent;
 }
-.editor-image--empty .editor-image-overlay::after{
+.editor-image--empty .editor-image-overlay-change{
   border-color: rgba(0,0,0,.25);
   color: rgba(0,0,0,.4);
+}
+.editor-image--empty .editor-image-overlay-change:hover{
+  background: rgba(0,0,0,.04);
 }
 .editor-image-hint{
   position: absolute;
