@@ -7,7 +7,9 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "migrate": "node scripts/migrate-to-supabase.js"
+    "migrate": "node scripts/migrate-to-supabase.js",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
@@ -16,9 +18,11 @@
     "@tiptap/pm": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
     "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0"
+    "@vercel/speed-insights": "^2.0.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "dotenv": "^16.4.5",
     "vite": "^7.2.4"
   }

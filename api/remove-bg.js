@@ -1,6 +1,41 @@
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 const REMOVE_BG_URL = "https://api.remove.bg/v1.0/removebg";
+
+// Shared canvas (matches placeholder bag aspect 728:1125) and the fraction of
+// the canvas the subject should occupy along its longest dimension. Normalising
+// every cutout to this frame keeps grid tiles at a comparable visual scale.
+const CANVAS_W = 1100;
+const CANVAS_H = 1700;
+const SUBJECT_FILL = 0.92;
+
+async function normaliseCutout(pngBuffer) {
+  const trimmed = await sharp(pngBuffer)
+    .trim()
+    .toBuffer({ resolveWithObject: true });
+  const { width: tw, height: th } = trimmed.info;
+  const scale = Math.min(
+    (CANVAS_W * SUBJECT_FILL) / tw,
+    (CANVAS_H * SUBJECT_FILL) / th,
+  );
+  const newW = Math.max(1, Math.round(tw * scale));
+  const newH = Math.max(1, Math.round(th * scale));
+  const resized = await sharp(trimmed.data).resize(newW, newH).toBuffer();
+  const left = Math.floor((CANVAS_W - newW) / 2);
+  const top = Math.floor((CANVAS_H - newH) / 2);
+  return sharp({
+    create: {
+      width: CANVAS_W,
+      height: CANVAS_H,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: resized, left, top }])
+    .png()
+    .toBuffer();
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: "6mb" } },
@@ -113,7 +148,14 @@ export default async function handler(req, res) {
   });
 
   const arrayBuf = await upstream.arrayBuffer();
+  let outBuf;
+  try {
+    outBuf = await normaliseCutout(Buffer.from(arrayBuf));
+  } catch (err) {
+    console.error("cutout normalise failed", err);
+    outBuf = Buffer.from(arrayBuf);
+  }
   res.setHeader("Content-Type", "image/png");
   res.setHeader("Cache-Control", "no-store");
-  return res.send(Buffer.from(arrayBuf));
+  return res.send(outBuf);
 }
